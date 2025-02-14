@@ -3,8 +3,12 @@ infrastructure
 opencilk
 opencilk-build
 
-# cpp
+# Lsp stuff
+.clangd
 compile_commands.json
 .cache
 *.o
+
 fib
+
+

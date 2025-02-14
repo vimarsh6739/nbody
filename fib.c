@@ -10,8 +10,8 @@ long fib(long n) {
     return n;
   long x, y;
   cilk_scope {
-    x = cilk_spawn fib(n-1);
-    y = fib(n-2);
+    x = cilk_spawn fib(n - 1);
+    y = fib(n - 2);
   }
   return x + y;
 }
@@ -33,4 +33,3 @@ int main(int argc, char *argv[]) {
   ctimer_print(t, "fib");
   return 0;
 }
-
