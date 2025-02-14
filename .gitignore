@@ -1,8 +1,10 @@
-# OpenCILK build folders and dependencies
+# OpenCILK 
 infrastructure
 opencilk
 opencilk-build
 
-# CUDA dependencies
-
-# Julia dependencies
+# cpp
+compile_commands.json
+.cache
+*.o
+fib

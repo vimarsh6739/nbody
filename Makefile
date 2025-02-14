@@ -1,5 +1,5 @@
-CILK_C= opencilk-build/bin/clang
-CILK_CXX= opencilk-build/bin/clang++
+CILK_C= $(realpath opencilk-build/bin/clang)
+CILK_CXX= $(realpath opencilk-build/bin/clang++)
 CILK_FLAGS= -fopencilk
 LDFLAGS= 
 CLFAGS= -O2 -Wall
