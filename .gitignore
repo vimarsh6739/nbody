@@ -1,0 +1,8 @@
+# OpenCILK build folders and dependencies
+infrastructure
+opencilk
+opencilk-build
+
+# CUDA dependencies
+
+# Julia dependencies
