@@ -1,11 +1,17 @@
 CILK_C= $(realpath opencilk-build/bin/clang)
-CILK_CXX= $(realpath opencilk-build/bin/clang++)
+CILK_CXX= opencilk-build/bin/clang++
 CILK_FLAGS= -fopencilk
 LDFLAGS= 
 CLFAGS= -O2 -Wall
 
 .PHONY: all
-all: fib qsort
+all: fib qsort nbody
+
+nbody: nbody.o
+	$(CILK_CXX) $(CILK_FLAGS) $^ -o $@ $(LDFLAGS)
+
+nbody.o: nbody.cpp
+	$(CILK_CXX) $(CFLAGS) $(CILK_FLAGS) -c $< -o $@
 
 qsort: qsort.o
 	$(CILK_C) $(CILK_FLAGS) $^ -o $@ $(LDFLAGS)
@@ -22,4 +28,4 @@ fib.o: fib.c
 .PHONY: clean
 clean:
 	rm -f *.o
-	rm -f fib qsort
+	rm -f fib qsort nbody

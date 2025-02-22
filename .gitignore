@@ -9,6 +9,9 @@ compile_commands.json
 .cache
 *.o
 
+#binaries
 fib
+nbody
+qsort
 
 
