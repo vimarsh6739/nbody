@@ -1,5 +1,3 @@
-// Starter code for nbody ( adapted from Mark Harris' implementation)
-
 #include "ctimer.h"
 #include <cmath>
 #include <cstdio>
@@ -7,16 +5,25 @@
 using namespace std;
 
 #define SOFTENING 1e-9f
+
 typedef struct {
-  float x, y, z, vx, vy, vz;
+  float x, y, z, vx, vy, vz, m; // added mass field 'm'
 } Body;
 
+// Randomize positions and velocities in the range [-1, 1].
+// For the mass (every 7th float), randomize in the range [0.1, 1.0].
 void randomizeBodies(float *data, int n) {
   for (int i = 0; i < n; i++) {
-    data[i] = 2.0f * (rand() / (float)RAND_MAX) - 1.0f;
+    // Every 7th element corresponds to the mass of a body.
+    if ((i + 1) % 7 == 0) {
+      data[i] = 0.1f + 0.9f * (rand() / (float)RAND_MAX);
+    } else {
+      data[i] = 2.0f * (rand() / (float)RAND_MAX) - 1.0f;
+    }
   }
 }
 
+// Compute gravitational force on each body incorporating the mass of the other bodies.
 void bodyForce(Body *p, float dt, int n) {
   for (int i = 0; i < n; i++) {
     float Fx = 0.0f;
@@ -31,9 +38,9 @@ void bodyForce(Body *p, float dt, int n) {
       float invDist = 1.0f / sqrtf(distSqr);
       float invDist3 = invDist * invDist * invDist;
 
-      Fx += dx * invDist3;
-      Fy += dy * invDist3;
-      Fz += dz * invDist3;
+      Fx += dx * p[j].m * invDist3;
+      Fy += dy * p[j].m * invDist3;
+      Fz += dz * p[j].m * invDist3;
     }
 
     p[i].vx += dt * Fx;
@@ -55,7 +62,7 @@ int main(const int argc, const char **argv) {
   float *buf = (float *)malloc(bytes);
   Body *p = (Body *)buf;
 
-  randomizeBodies(buf, 6 * nBodies); // Init pos / vel data
+  randomizeBodies(buf, 7 * nBodies);
 
   double totalTime = 0.0;
   ctimer_t timer;
@@ -82,16 +89,17 @@ int main(const int argc, const char **argv) {
     printf("Iteration %d: %.3f seconds\n", iter, tElapsed);
 #endif
   }
+  
   double avgTime = totalTime / (double)(nIters - 1);
 
 #ifdef SHMOO
   printf("%d, %0.3f\n", nBodies, 1e-9 * nBodies * nBodies / avgTime);
 #else
-  printf("Average time for iterations 2 through %d: %.3f second.\n",
-         nIters);
+  printf("Average time for iterations 2 through %d: %.3f seconds.\n", nIters, avgTime);
   printf("%d Bodies: average %0.3f Billion Interactions / second\n", nBodies,
          1e-9 * nBodies * nBodies / avgTime);
 #endif
-  free(buf);
-}
 
+  free(buf);
+  return 0;
+}
