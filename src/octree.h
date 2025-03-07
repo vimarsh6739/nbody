@@ -19,13 +19,22 @@ class Node {
 public:
   int key;
   bool isLeaf;
+
   Node *parent;
   Node *children[8];
   char whichChildren;
 
+  int subTreeSize; // used to build autoropes
+
   Node(int key, bool isLeaf);
 };
 
+typedef struct DFTNode {
+  int index;
+  int key;
+  bool isLeaf;
+  int autorope;
+};
 class Octree {
 
 public:
@@ -37,6 +46,9 @@ public:
   void addChild(Node *parent, Node *child, int index, bool isLeaf, int key);
   void insert(Body body);
   void printTree(Node *node, int level);
+  void buildDFT(std::vector<DFTNode> &nodes);
+  void traverse(Node *node, std::vector<DFTNode> &nodes);
+  void setSubtreeSizes(Node *node);
 };
 
 #endif // OCTREE_H

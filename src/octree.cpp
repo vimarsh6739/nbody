@@ -9,6 +9,7 @@
 Node::Node(int key, bool isLeaf) {
   this->key = key;
   this->isLeaf = isLeaf;
+  this->subTreeSize = 1;
 }
 
 Octree::Octree(int maxKeyLength) {
@@ -22,7 +23,8 @@ void Octree::addChild(Node *parent, Node *child, int index, bool isLeaf,
                       int mykey) {
   assert(parent->isLeaf == false);
   assert(mykey > 0);
-  parent->children[index] = new Node(mykey, false);
+
+  parent->children[index] = new Node(mykey, isLeaf);
   parent->children[index]->parent = parent;
   parent->whichChildren |= 1 << index;
 }
@@ -64,7 +66,7 @@ void Octree::printTree(Node *node, int level) {
   for (int i = 0; i < level; i++)
     printf("  ");
 
-  printf("0b%s\n", binaryString(node->key).c_str());
+  printf("0b%s (%d)\n", binaryString(node->key).c_str(), node->key);
 
   if (!node->isLeaf) {
     for (int i = 0; i < 8; i++) {
@@ -117,4 +119,59 @@ int binaryLength(int n) {
     length += 3 - length % 3;
   assert(length % 3 == 0);
   return length;
+}
+
+void Octree::setSubtreeSizes(Node *node) {
+  if (node == NULL)
+    return;
+
+  if (node->isLeaf) {
+    node->subTreeSize = 1;
+    return;
+  }
+
+  for (int i = 0; i < 8; i++) {
+    if (node->whichChildren & (1 << i)) {
+      setSubtreeSizes(node->children[i]);
+      node->subTreeSize += node->children[i]->subTreeSize;
+    }
+  }
+}
+
+void Octree::buildDFT(std::vector<DFTNode> &nodes) {
+  setSubtreeSizes(this->root);
+  traverse(this->root, nodes);
+
+  printf("DFT: ");
+  for (int i = 0; i < nodes.size(); i++) {
+    int autoropeNext = nodes[i].autorope;
+    if (autoropeNext >= nodes.size())
+      printf("%d (-1), ", nodes[i].key);
+    else
+      printf("%d (%d), ", nodes[i].key, nodes[autoropeNext].key);
+  }
+  printf("\n");
+}
+
+void Octree::traverse(Node *node, std::vector<DFTNode> &nodes) {
+  if (node == NULL)
+    return;
+
+  DFTNode dftNode;
+  dftNode.key = node->key;
+  dftNode.isLeaf = node->isLeaf;
+  dftNode.index = nodes.size();
+
+  dftNode.autorope =
+      dftNode.index +
+      node->subTreeSize; // if autorope is out of bounds, traversal is donexw
+
+  nodes.push_back(dftNode);
+
+  if (!node->isLeaf) {
+    for (int i = 0; i < 8; i++) {
+      if (node->whichChildren & (1 << i))
+        traverse(node->children[i], nodes);
+    }
+  }
 }

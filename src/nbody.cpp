@@ -108,6 +108,9 @@ int main(const int argc, const char **argv) {
 
   octree->printTree(octree->root, 0);
 
+  std::vector<DFTNode> dft;
+  octree->buildDFT(dft);
+
   //   double totalTime = 0.0;
   //   ctimer_t timer;
 
