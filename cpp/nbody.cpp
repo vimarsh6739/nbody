@@ -1,24 +1,26 @@
 #include "ctimer.h"
+#include "octree.h"
+#include "philox_engine.h"
 #include <assert.h>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
-
-#include "octree.h"
+#include <random>
 
 #define SOFTENING 1e-9f
 #define POSMAX 100
 
 // Randomize the positions and velocities in the range [-1, 1],
 // and assign a mass (every 7th float) in the range [0.1, 1.0].
-int randomizeBodies(Body *bodies, int n) {
+int randomizeBodies(PhiloxEngine &rng, Body *bodies, int n) {
   int maxKeyLength = 0;
-
+  std::uniform_int_distribution<int> x_dis(0, POSMAX - 1);
+  std::uniform_real_distribution<float> v_dis(0, 1);
   for (int i = 0; i < n; i++) {
     Body &body = bodies[i];
-    body.x = rand() % POSMAX;
-    body.y = rand() % POSMAX;
-    body.z = rand() % POSMAX;
+    body.x = x_dis(rng);
+    body.y = x_dis(rng);
+    body.z = x_dis(rng);
 
     body.key = getKeyNoPrepend(body);
     int keylength = binaryLength(body.key);
@@ -26,10 +28,10 @@ int randomizeBodies(Body *bodies, int n) {
       maxKeyLength = keylength;
     }
 
-    body.vx = (rand() / (float)RAND_MAX) * 2 - 1;
-    body.vy = (rand() / (float)RAND_MAX) * 2 - 1;
-    body.vz = (rand() / (float)RAND_MAX) * 2 - 1;
-    body.m = (rand() / (float)RAND_MAX) + 0.1f;
+    body.vx = (v_dis(rng)) * 2 - 1;
+    body.vy = (v_dis(rng)) * 2 - 1;
+    body.vz = (v_dis(rng)) * 2 - 1;
+    body.m = (v_dis(rng)) + 0.1f;
   }
 
   // prepend all keys
@@ -83,9 +85,8 @@ void integratePositions(Body *p, float dt, int n) {
 }
 
 int main(const int argc, const char **argv) {
-  printf("NBody using Cilk Plus\n");
-
-  srand(2025);
+  printf("NBody using Octree\n");
+  PhiloxEngine rng(2025);
   int nBodies = 2;
   if (argc > 1)
     nBodies = atoi(argv[1]);
@@ -98,7 +99,7 @@ int main(const int argc, const char **argv) {
   Body *p = new Body[nBodies];
 
   // Initialize positions, velocities, and masses (7 values per body)
-  int maxkeylength = randomizeBodies(p, nBodies);
+  int maxkeylength = randomizeBodies(rng, p, nBodies);
   printf("Randomized bodies with maxkeylength = %d\n", maxkeylength);
 
   Octree *octree = new Octree(maxkeylength);
