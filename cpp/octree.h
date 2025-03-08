@@ -2,6 +2,7 @@
 #define OCTREE_H
 
 #include <string>
+#include <vector>
 
 typedef int Key;
 
