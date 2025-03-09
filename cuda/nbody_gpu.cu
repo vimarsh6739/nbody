@@ -6,13 +6,12 @@
 #include <cuda_runtime.h>
 
 #define SOFTENING 1e-9f
-#define BLOCK_SIZE 256  // CUDA thread block size
+#define BLOCK_SIZE 256 
 
 typedef struct {
-  float x, y, z, vx, vy, vz, m;  // each body now has a mass 'm'
+  float x, y, z, vx, vy, vz, m; 
 } Body;
 
-// CUDA error checking helper function
 #define checkCudaErrors(call) do {                                 \
   cudaError_t err = call;                                          \
   if (err != cudaSuccess) {                                        \
@@ -22,15 +21,11 @@ typedef struct {
   }                                                                \
 } while (0)
 
-// Randomize the positions and velocities in the range [-1, 1],
-// and assign a mass (every 7th float) in the range [0.1, 1.0].
 void randomizeBodies(float *data, int n) {
   for (int i = 0; i < n; i++) {
     if ((i + 1) % 7 == 0) {
-      // Mass values between 0.1 and 1.0
       data[i] = 0.1f + 0.9f * philox_random_float();
     } else {
-      // Position and velocity values between -1.0 and 1.0
       data[i] = 2.0f * philox_random_float() - 1.0f;
     }
   }
@@ -73,30 +68,24 @@ __global__ void integratePositionsKernel(Body *p, float dt, int n) {
 }
 
 int main(const int argc, const char **argv) {
-  // Initialize philox RNG with seed
   philox_seed(2025);
   int nBodies = 10000;
   if (argc > 1)
     nBodies = atoi(argv[1]);
 
-  const float dt = 0.01f; // time step
-  const int nIters = 10;  // simulation iterations
+  const float dt = 0.01f;
+  const int nIters = 10; 
 
-  // Allocate memory for nBodies on CPU
   int bytes = nBodies * sizeof(Body);
   Body *h_bodies = (Body *)malloc(bytes);
 
-  // Initialize positions, velocities, and masses on CPU
   randomizeBodies((float *)h_bodies, 7 * nBodies);
 
-  // Allocate memory on GPU
   Body *d_bodies;
   checkCudaErrors(cudaMalloc(&d_bodies, bytes));
 
-  // Copy data from CPU to GPU once at the beginning
   checkCudaErrors(cudaMemcpy(d_bodies, h_bodies, bytes, cudaMemcpyHostToDevice));
 
-  // Define CUDA grid dimensions
   const int blockSize = BLOCK_SIZE;
   const int gridSize = (nBodies + blockSize - 1) / blockSize;
 
@@ -106,22 +95,19 @@ int main(const int argc, const char **argv) {
   for (int iter = 1; iter <= nIters; iter++) {
     ctimer_start(&timer);
 
-    // Compute interbody forces
     bodyForceKernel<<<gridSize, blockSize>>>(d_bodies, dt, nBodies);
     checkCudaErrors(cudaGetLastError());
 
-    // Integrate positions
     integratePositionsKernel<<<gridSize, blockSize>>>(d_bodies, dt, nBodies);
     checkCudaErrors(cudaGetLastError());
 
-    // Synchronize GPU to make sure computation is done before stopping the timer
     checkCudaErrors(cudaDeviceSynchronize());
 
     ctimer_stop(&timer);
     ctimer_measure(&timer);
     double tElapsed = timespec_sec(timer.elapsed);
 
-    if (iter > 1) // skip the first iteration as warm-up
+    if (iter > 1)
       totalTime += tElapsed;
 
 #ifndef SHMOO
@@ -129,7 +115,6 @@ int main(const int argc, const char **argv) {
 #endif
   }
 
-  // Copy results back to CPU once at the end
   checkCudaErrors(cudaMemcpy(h_bodies, d_bodies, bytes, cudaMemcpyDeviceToHost));
 
   double avgTime = totalTime / (double)(nIters - 1);
@@ -141,7 +126,6 @@ int main(const int argc, const char **argv) {
          1e-9 * nBodies * nBodies / avgTime);
 #endif
 
-  // Cleanup
   free(h_bodies);
   checkCudaErrors(cudaFree(d_bodies));
 
