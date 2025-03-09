@@ -4,13 +4,15 @@ LDFLAGS=
 
 OBJ_DIR := obj
 BENCH_BIN := nbody
-
+# Find all cpp files in src directory
 SRCS := $(wildcard *.cpp)
 
+# Generate object file names
 OBJS := $(SRCS:%.cpp=$(OBJ_DIR)/%.o)
 
 all: directories $(BENCH_BIN)
 
+# create necessary directories
 directories:
 	@mkdir -p $(OBJ_DIR)
 
@@ -26,6 +28,7 @@ clean:
 	@echo "Cleaning build files..."
 	@rm -rf $(OBJ_DIR) $(BENCH_BIN)
 
+# clean and rebuild
 rebuild: clean all
 
 .PHONY: all clean rebuild directories 
