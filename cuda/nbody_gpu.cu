@@ -1,4 +1,5 @@
 #include "ctimer.h"
+#include "philox_engine.h"
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -25,10 +26,13 @@ typedef struct {
 // and assign a mass (every 7th float) in the range [0.1, 1.0].
 void randomizeBodies(float *data, int n) {
   for (int i = 0; i < n; i++) {
-    if ((i + 1) % 7 == 0)
-      data[i] = 0.1f + 0.9f * (rand() / (float)RAND_MAX);
-    else
-      data[i] = 2.0f * (rand() / (float)RAND_MAX) - 1.0f;
+    if ((i + 1) % 7 == 0) {
+      // Mass values between 0.1 and 1.0
+      data[i] = 0.1f + 0.9f * philox_random_float();
+    } else {
+      // Position and velocity values between -1.0 and 1.0
+      data[i] = 2.0f * philox_random_float() - 1.0f;
+    }
   }
 }
 
@@ -69,7 +73,8 @@ __global__ void integratePositionsKernel(Body *p, float dt, int n) {
 }
 
 int main(const int argc, const char **argv) {
-  srand(2025);
+  // Initialize philox RNG with seed
+  philox_seed(2025);
   int nBodies = 10000;
   if (argc > 1)
     nBodies = atoi(argv[1]);
