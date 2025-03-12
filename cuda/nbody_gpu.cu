@@ -13,7 +13,7 @@ typedef struct {
   float x, y, z, vx, vy, vz, m;
 } Body;
 
-#define checkCudaErrors(call)                                                  \
+#define CUDA_CALL(call)                                                  \
   do {                                                                         \
     cudaError_t err = call;                                                    \
     if (err != cudaSuccess) {                                                  \
@@ -92,9 +92,9 @@ int main(const int argc, const char **argv) {
   randomizeBodies(rng, h_bodies, nBodies);
 
   Body *d_bodies;
-  checkCudaErrors(cudaMalloc(&d_bodies, bytes));
+  CUDA_CALL(cudaMalloc(&d_bodies, bytes));
 
-  checkCudaErrors(
+  CUDA_CALL(
       cudaMemcpy(d_bodies, h_bodies, bytes, cudaMemcpyHostToDevice));
 
   const int blockSize = BLOCK_SIZE;
@@ -107,12 +107,12 @@ int main(const int argc, const char **argv) {
     ctimer_start(&timer);
 
     bodyForceKernel<<<gridSize, blockSize>>>(d_bodies, dt, nBodies);
-    checkCudaErrors(cudaGetLastError());
+    CUDA_CALL(cudaGetLastError());
 
     integratePositionsKernel<<<gridSize, blockSize>>>(d_bodies, dt, nBodies);
-    checkCudaErrors(cudaGetLastError());
+    CUDA_CALL(cudaGetLastError());
 
-    checkCudaErrors(cudaDeviceSynchronize());
+    CUDA_CALL(cudaDeviceSynchronize());
 
     ctimer_stop(&timer);
     ctimer_measure(&timer);
@@ -126,7 +126,7 @@ int main(const int argc, const char **argv) {
 #endif
   }
 
-  checkCudaErrors(
+  CUDA_CALL(
       cudaMemcpy(h_bodies, d_bodies, bytes, cudaMemcpyDeviceToHost));
 
   double avgTime = totalTime / (double)(nIters - 1);
@@ -140,7 +140,7 @@ int main(const int argc, const char **argv) {
 #endif
 
   free(h_bodies);
-  checkCudaErrors(cudaFree(d_bodies));
+  CUDA_CALL(cudaFree(d_bodies));
 
   return 0;
 }
