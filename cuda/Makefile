@@ -1,8 +1,8 @@
 NVCC := nvcc
 CXX := g++
 CXXFLAGS := -std=c++17 -Wall -Wextra -I. -O2
-NVCCFLAGS := -std=c++17 -O2 -I.
-LDFLAGS := -lcudart
+NVCCFLAGS := -std=c++17 -I.
+LDFLAGS := -lcudart -ldl -lrt -lpthread
 
 OBJ_DIR := obj
 BENCH_BIN := nbody_gpu

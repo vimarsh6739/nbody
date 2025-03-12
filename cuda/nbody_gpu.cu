@@ -4,87 +4,98 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cuda_runtime.h>
+#include <random>
 
 #define SOFTENING 1e-9f
-#define BLOCK_SIZE 256 
+#define BLOCK_SIZE 256
 
 typedef struct {
-  float x, y, z, vx, vy, vz, m; 
+  float x, y, z, vx, vy, vz, m;
 } Body;
 
-#define checkCudaErrors(call) do {                                 \
-  cudaError_t err = call;                                          \
-  if (err != cudaSuccess) {                                        \
-    fprintf(stderr, "CUDA error in %s:%d: %s\n",                   \
-            __FILE__, __LINE__, cudaGetErrorString(err));          \
-    exit(EXIT_FAILURE);                                            \
-  }                                                                \
-} while (0)
+#define checkCudaErrors(call)                                                  \
+  do {                                                                         \
+    cudaError_t err = call;                                                    \
+    if (err != cudaSuccess) {                                                  \
+      fprintf(stderr, "CUDA error in %s:%d: %s\n", __FILE__, __LINE__,         \
+              cudaGetErrorString(err));                                        \
+      exit(EXIT_FAILURE);                                                      \
+    }                                                                          \
+  } while (0)
 
-void randomizeBodies(float *data, int n) {
+void randomizeBodies(PhiloxEngine &rng, Body *bodies, int n) {
+  std::uniform_real_distribution<float> x_dis(0, 1);
+  std::uniform_real_distribution<float> v_dis(0, 1);
+
   for (int i = 0; i < n; i++) {
-    if ((i + 1) % 7 == 0) {
-      data[i] = 0.1f + 0.9f * philox_random_float();
-    } else {
-      data[i] = 2.0f * philox_random_float() - 1.0f;
-    }
+    Body &body = bodies[i];
+    body.x = 1 * x_dis(rng);
+    body.y = 1 * x_dis(rng);
+    body.z = 1 * x_dis(rng);
+
+    body.vx = (v_dis(rng)) * 2 - 1;
+    body.vy = (v_dis(rng)) * 2 - 1;
+    body.vz = (v_dis(rng)) * 2 - 1;
+    body.m = (v_dis(rng)) + 0.15f;
   }
 }
 
-// CUDA kernel to compute body forces
-__global__ void bodyForceKernel(Body *p, float dt, int n) {
+__global__ void bodyForceKernel(Body *body, float dt, int n) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
-  
-  if (i < n) {
-    float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
-    
-    for (int j = 0; j < n; j++) {
-      float dx = p[j].x - p[i].x;
-      float dy = p[j].y - p[i].y;
-      float dz = p[j].z - p[i].z;
-      float distSqr = dx * dx + dy * dy + dz * dz + SOFTENING;
-      float invDist = rsqrtf(distSqr);  // GPU optimized inverse square root
-      float invDist3 = invDist * invDist * invDist;
+  if (i >= n)
+    return;
+  float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
 
-      Fx += dx * p[j].m * invDist3;
-      Fy += dy * p[j].m * invDist3;
-      Fz += dz * p[j].m * invDist3;
-    }
-    
-    p[i].vx += dt * Fx;
-    p[i].vy += dt * Fy;
-    p[i].vz += dt * Fz;
+  for (int j = 0; j < n; j++) {
+    float dx = body[j].x - body[i].x;
+    float dy = body[j].y - body[i].y;
+    float dz = body[j].z - body[i].z;
+
+    float distSqr = dx * dx + dy * dy + dz * dz + SOFTENING;
+    float invDist = rsqrtf(distSqr); // GPU optimized inverse square root
+    float invDist3 = invDist * invDist * invDist;
+
+    // Compute force components
+    Fx += dx * body[j].m * invDist3;
+    Fy += dy * body[j].m * invDist3;
+    Fz += dz * body[j].m * invDist3;
   }
+
+  // update velocities
+  body[i].vx += dt * Fx;
+  body[i].vy += dt * Fy;
+  body[i].vz += dt * Fz;
 }
 
 // CUDA kernel to integrate positions
 __global__ void integratePositionsKernel(Body *p, float dt, int n) {
-  int i = blockIdx.x * blockDim.x + threadIdx.x;
-  if (i < n) {
-    p[i].x += p[i].vx * dt;
-    p[i].y += p[i].vy * dt;
-    p[i].z += p[i].vz * dt;
+  int tid = blockIdx.x * blockDim.x + threadIdx.x;
+  if (tid < n) {
+    p[tid].x += p[tid].vx * dt;
+    p[tid].y += p[tid].vy * dt;
+    p[tid].z += p[tid].vz * dt;
   }
 }
 
 int main(const int argc, const char **argv) {
-  philox_seed(2025);
+  PhiloxEngine rng(2025); // set the rng with the seed
   int nBodies = 10000;
   if (argc > 1)
     nBodies = atoi(argv[1]);
 
   const float dt = 0.01f;
-  const int nIters = 10; 
+  const int nIters = 15;
 
   int bytes = nBodies * sizeof(Body);
-  Body *h_bodies = (Body *)malloc(bytes);
+  Body *h_bodies = (Body *)calloc(nBodies, sizeof(Body));
 
-  randomizeBodies((float *)h_bodies, 7 * nBodies);
+  randomizeBodies(rng, h_bodies, nBodies);
 
   Body *d_bodies;
   checkCudaErrors(cudaMalloc(&d_bodies, bytes));
 
-  checkCudaErrors(cudaMemcpy(d_bodies, h_bodies, bytes, cudaMemcpyHostToDevice));
+  checkCudaErrors(
+      cudaMemcpy(d_bodies, h_bodies, bytes, cudaMemcpyHostToDevice));
 
   const int blockSize = BLOCK_SIZE;
   const int gridSize = (nBodies + blockSize - 1) / blockSize;
@@ -115,13 +126,15 @@ int main(const int argc, const char **argv) {
 #endif
   }
 
-  checkCudaErrors(cudaMemcpy(h_bodies, d_bodies, bytes, cudaMemcpyDeviceToHost));
+  checkCudaErrors(
+      cudaMemcpy(h_bodies, d_bodies, bytes, cudaMemcpyDeviceToHost));
 
   double avgTime = totalTime / (double)(nIters - 1);
 #ifdef SHMOO
   printf("%d, %0.3f\n", nBodies, 1e-9 * nBodies * nBodies / avgTime);
 #else
-  printf("Average time for iterations 2 through %d: %.3f seconds.\n", nIters, avgTime);
+  printf("Average time for iterations 2 through %d: %.3f seconds.\n", nIters,
+         avgTime);
   printf("%d Bodies: average %0.3f Billion Interactions / second\n", nBodies,
          1e-9 * nBodies * nBodies / avgTime);
 #endif
