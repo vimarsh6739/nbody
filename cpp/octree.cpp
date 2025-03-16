@@ -6,6 +6,8 @@
 #include <assert.h>
 #include <math.h>
 
+#define SHIFT_DIGITS 10
+
 Node::Node(int key, bool isLeaf) {
   this->key = key;
   this->isLeaf = isLeaf;
@@ -86,20 +88,32 @@ std::string binaryString(Key k) {
 int getKeyNoPrepend(Body body) {
   int key = 0;
 
-  // interleave x, y, z bits
-  int x = body.x;
-  int y = body.y;
-  int z = body.z;
+  float x = body.x;
+  float y = body.y;
+  float z = body.z;
+
+  // shift and trunacte
+  int shift = 1 << SHIFT_DIGITS;
+  int xint = static_cast<int>(x * shift);
+  int yint = static_cast<int>(y * shift);
+  int zint = static_cast<int>(z * shift);
+
+  // Check for overflow
+  if (xint < 0 || yint < 0 || zint < 0) {
+    fprintf(stderr, "Error: Integer overflow detected in getKeyNoPrepend\n");
+    exit(EXIT_FAILURE);
+  }
 
   int i = 0;
-  while (x || y || z) {
-    key |= (body.x & (1 << i)) << i;
-    key |= (body.y & (1 << i)) << (i + 1);
-    key |= (body.z & (1 << i)) << (i + 2);
+  while (xint || yint || zint) {
+    key |= (xint & (1 << i)) << i;
+    key |= (yint & (1 << i)) << (i + 1);
+    key |= (zint & (1 << i)) << (i + 2);
 
-    x = x >> 1;
-    y = y >> 1;
-    z = z >> 1;
+    xint = xint >> 1;
+    yint = yint >> 1;
+    zint = zint >> 1;
+
     i += 3;
   }
 

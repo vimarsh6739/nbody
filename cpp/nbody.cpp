@@ -14,7 +14,7 @@
 // and assign a mass (every 7th float) in the range [0.1, 1.0].
 int randomizeBodies(PhiloxEngine &rng, Body *bodies, int n) {
   int maxKeyLength = 0;
-  std::uniform_int_distribution<int> x_dis(0, POSMAX - 1);
+  std::uniform_real_distribution<float> x_dis(0, 1);
   std::uniform_real_distribution<float> v_dis(0, 1);
   for (int i = 0; i < n; i++) {
     Body &body = bodies[i];

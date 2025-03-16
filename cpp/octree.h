@@ -7,8 +7,7 @@
 typedef int Key;
 
 typedef struct {
-  int x, y, z;         // position must be ints for key building
-  float vx, vy, vz, m; // each body now has a mass 'm'
+  float x, y, z, vx, vy, vz, m; // each body now has a mass 'm'
   Key key;
 } Body;
 
