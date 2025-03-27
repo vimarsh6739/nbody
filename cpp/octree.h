@@ -49,6 +49,7 @@ public:
   void buildDFT(std::vector<DFTNode> &nodes);
   void traverse(Node *node, std::vector<DFTNode> &nodes);
   void setSubtreeSizes(Node *node);
+  void splitNode(Node *current, int index, int nLevels, int level);
 };
 
 #endif // OCTREE_H

@@ -31,6 +31,18 @@ void Octree::addChild(Node *parent, Node *child, int index, bool isLeaf,
   parent->whichChildren |= 1 << index;
 }
 
+void Octree::splitNode(Node *current, int index, int nLevels, int level) {
+  Node *child = current->children[index];
+  int shifted = child->key >> (3 * (nLevels - level - 1));
+  int childIndex = shifted & 0x7;
+  current->children[index] = new Node(shifted, false);
+  current->children[index]->parent = current;
+
+  child->parent = current->children[index];
+  current->children[index]->children[childIndex] = child;
+  current->children[index]->whichChildren |= 1 << childIndex;
+}
+
 void Octree::insert(Body body) {
   Node *current = root;
   int key = body.key;
@@ -44,8 +56,24 @@ void Octree::insert(Body body) {
     Key shifted = key >> (3 * (nLevels - level - 1));
     int index = shifted & 0x7;
 
+    if (current->whichChildren == 0) {
+      break;
+    }
+
     if (current->children[index] == NULL) {
       addChild(current, current->children[index], index, false, shifted);
+
+      for (int i = 0; i < 8; i++) {
+        if (current->children[i] != NULL && current->children[i]->isLeaf) {
+          splitNode(current, i, nLevels, level);
+        }
+      }
+    } else {
+      Node *child = current->children[index];
+      if (child->isLeaf) {
+        splitNode(current, index, nLevels, level);
+        // break;
+      }
     }
 
     current = current->children[index];
@@ -53,8 +81,8 @@ void Octree::insert(Body body) {
   }
 
   // insert leaf
-  assert(level == nLevels - 1);
-  int index = key & 0x7;
+  // assert(level == nLevels - 1);
+  int index = (key >> (3 * (nLevels - level - 1))) & 0x7;
 
   // otherwise have to handle duplicate keys
   assert(current->children[index] == NULL);
