@@ -4,36 +4,41 @@
 #include <string>
 #include <vector>
 
-typedef int Key;
+typedef long long Key;
 
 typedef struct {
   float x, y, z, vx, vy, vz, m; // each body now has a mass 'm'
   Key key;
+  int index; // index of the body in the bodies array
 } Body;
 
-int getKeyNoPrepend(Body b);
-int binaryLength(int n);
+Key getKeyNoPrepend(Body b);
+int binaryLength(Key n);
 std::string binaryString(Key key);
 
 class Node {
 public:
-  int key;
+  Key key;
   bool isLeaf;
 
   Node *parent;
   Node *children[8];
   char whichChildren;
 
+  std::vector<int> bodies; // indeces into the bodies array
+
   int subTreeSize; // used to build autoropes
 
-  Node(int key, bool isLeaf);
+  Node(Key key, bool isLeaf);
 };
 
 typedef struct DFTNode {
   int index;
-  int key;
+  Key key;
   bool isLeaf;
   int autorope;
+
+  std::vector<int> bodies; // indeces into the bodies array
 };
 class Octree {
 
@@ -44,7 +49,7 @@ public:
 
   Octree(int maxKeyLength);
   void addChild(Node *parent, Node *child, int index, bool isLeaf, int key);
-  void insert(Body body);
+  int insert(Body body);
   void printTree(Node *node, int level);
   void buildDFT(std::vector<DFTNode> &nodes);
   void traverse(Node *node, std::vector<DFTNode> &nodes);

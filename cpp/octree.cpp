@@ -6,9 +6,9 @@
 #include <assert.h>
 #include <math.h>
 
-#define SHIFT_DIGITS 10
+#define SHIFT_DIGITS 5
 
-Node::Node(int key, bool isLeaf) {
+Node::Node(Key key, bool isLeaf) {
   this->key = key;
   this->isLeaf = isLeaf;
   this->subTreeSize = 1;
@@ -33,8 +33,8 @@ void Octree::addChild(Node *parent, Node *child, int index, bool isLeaf,
 
 void Octree::splitNode(Node *current, int index, int nLevels, int level) {
   Node *child = current->children[index];
-  int shifted = child->key >> (3 * (nLevels - level - 1));
-  int childIndex = shifted & 0x7;
+  Key shifted = child->key >> (3 * (nLevels - level - 1));
+  int childIndex = (int)shifted & 0x7;
   current->children[index] = new Node(shifted, false);
   current->children[index]->parent = current;
 
@@ -43,9 +43,11 @@ void Octree::splitNode(Node *current, int index, int nLevels, int level) {
   current->children[index]->whichChildren |= 1 << childIndex;
 }
 
-void Octree::insert(Body body) {
+int Octree::insert(Body body) {
   Node *current = root;
-  int key = body.key;
+  Key key = body.key;
+
+  int arrIndex = body.index;
 
   assert(key >> (leafLength - 1) == 1);  // check that all keys are prepended
   assert(nLevels * 3 == leafLength - 1); // check nlevels
@@ -54,7 +56,7 @@ void Octree::insert(Body body) {
   int level = 0;
   while (level < nLevels - 1) {
     Key shifted = key >> (3 * (nLevels - level - 1));
-    int index = shifted & 0x7;
+    int index = (int)shifted & 0x7;
 
     if (current->whichChildren == 0) {
       break;
@@ -72,7 +74,6 @@ void Octree::insert(Body body) {
       Node *child = current->children[index];
       if (child->isLeaf) {
         splitNode(current, index, nLevels, level);
-        // break;
       }
     }
 
@@ -85,8 +86,18 @@ void Octree::insert(Body body) {
   int index = (key >> (3 * (nLevels - level - 1))) & 0x7;
 
   // otherwise have to handle duplicate keys
-  assert(current->children[index] == NULL);
-  addChild(current, current->children[index], index, true, key);
+  if (current->children[index] == NULL) {
+    addChild(current, current->children[index], index, true, key);
+    current->children[index]->bodies.push_back(arrIndex);
+
+    return 1;
+
+  } else {
+    current->children[index]->bodies.push_back(arrIndex);
+    if (current->children[index]->bodies.size() > 1) {
+    }
+    return 0;
+  }
 };
 
 void Octree::printTree(Node *node, int level) {
@@ -113,15 +124,15 @@ std::string binaryString(Key k) {
   return s + std::to_string(k % 2);
 }
 
-int getKeyNoPrepend(Body body) {
-  int key = 0;
+Key getKeyNoPrepend(Body body) {
+  Key key = 0;
 
   float x = body.x;
   float y = body.y;
   float z = body.z;
 
   // shift and trunacte
-  int shift = 1 << SHIFT_DIGITS;
+  Key shift = 1 << SHIFT_DIGITS;
   int xint = static_cast<int>(x * shift);
   int yint = static_cast<int>(y * shift);
   int zint = static_cast<int>(z * shift);
@@ -152,7 +163,7 @@ int getKeyNoPrepend(Body body) {
 }
 
 // should be a multiple of 3
-int binaryLength(int n) {
+int binaryLength(Key n) {
   if (n == 0)
     return 0;
 
@@ -184,15 +195,15 @@ void Octree::buildDFT(std::vector<DFTNode> &nodes) {
   setSubtreeSizes(this->root);
   traverse(this->root, nodes);
 
-  printf("DFT: ");
-  for (int i = 0; i < nodes.size(); i++) {
-    int autoropeNext = nodes[i].autorope;
-    if (autoropeNext >= nodes.size())
-      printf("%d (-1), ", nodes[i].key);
-    else
-      printf("%d (%d), ", nodes[i].key, nodes[autoropeNext].key);
-  }
-  printf("\n");
+  // printf("DFT: ");
+  // for (int i = 0; i < nodes.size(); i++) {
+  //   int autoropeNext = nodes[i].autorope;
+  //   if (autoropeNext >= nodes.size())
+  //     printf("%d (-1), ", nodes[i].key);
+  //   else
+  //     printf("%d (%d), ", nodes[i].key, nodes[autoropeNext].key);
+  // }
+  // printf("\n");
 }
 
 void Octree::traverse(Node *node, std::vector<DFTNode> &nodes) {
@@ -207,6 +218,8 @@ void Octree::traverse(Node *node, std::vector<DFTNode> &nodes) {
   dftNode.autorope =
       dftNode.index +
       node->subTreeSize; // if autorope is out of bounds, traversal is donexw
+
+  dftNode.bodies = node->bodies;
 
   nodes.push_back(dftNode);
 

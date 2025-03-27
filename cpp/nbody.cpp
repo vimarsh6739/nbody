@@ -22,6 +22,8 @@ int randomizeBodies(PhiloxEngine &rng, Body *bodies, int n) {
     body.y = x_dis(rng);
     body.z = x_dis(rng);
 
+    body.index = i;
+
     body.key = getKeyNoPrepend(body);
     int keylength = binaryLength(body.key);
     if (keylength > maxKeyLength) {
@@ -32,6 +34,14 @@ int randomizeBodies(PhiloxEngine &rng, Body *bodies, int n) {
     body.vy = (v_dis(rng)) * 2 - 1;
     body.vz = (v_dis(rng)) * 2 - 1;
     body.m = (v_dis(rng)) + 0.1f;
+
+    FILE *file = fopen("bodiesBefore.txt", "a");
+    if (file) {
+      fprintf(file, "Body %d: x=%f, y=%f, z=%f\n", i, body.x, body.y, body.z);
+      fclose(file);
+    } else {
+      printf("Error opening file for writing.\n");
+    }
   }
 
   // prepend all keys
@@ -43,31 +53,94 @@ int randomizeBodies(PhiloxEngine &rng, Body *bodies, int n) {
   return maxKeyLength + 1;
 }
 
-void bodyForceRange(Body *p, float dt, int start, int end, int n) {
-  for (int i = start; i < end; i++) {
-    float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
-    for (int j = 0; j < n; j++) {
-      float dx = p[j].x - p[i].x;
-      float dy = p[j].y - p[i].y;
-      float dz = p[j].z - p[i].z;
-      float distSqr = dx * dx + dy * dy + dz * dz + SOFTENING;
-      float invDist = 1.0f / sqrtf(distSqr);
-      float invDist3 = invDist * invDist * invDist;
+int MACInteractionsDFT(std::vector<DFTNode> dft, Body *bodies, int target,
+                       int dt, int nBodies) {
+  // iterate over all bodies (targets)
+  int nInteractions = 0;
+  float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
+  for (int j = 0; j < dft.size(); j++) {
+    if (dft[j].isLeaf) {
+      for (int bIndex : dft[j].bodies) {
+        nInteractions++;
+        float dx = bodies[bIndex].x - bodies[target].x;
+        float dy = bodies[bIndex].y - bodies[target].y;
+        float dz = bodies[bIndex].z - bodies[target].z;
+        float distSqr = dx * dx + dy * dy + dz * dz + SOFTENING;
+        float invDist = 1.0f / sqrtf(distSqr);
+        float invDist3 = invDist * invDist * invDist;
 
-      Fx += dx * p[j].m * invDist3;
-      Fy += dy * p[j].m * invDist3;
-      Fz += dz * p[j].m * invDist3;
+        Fx += dx * bodies[bIndex].m * invDist3;
+        Fy += dy * bodies[bIndex].m * invDist3;
+        Fz += dz * bodies[bIndex].m * invDist3;
+      }
     }
-    p[i].vx += dt * Fx;
-    p[i].vy += dt * Fy;
-    p[i].vz += dt * Fz;
   }
+  bodies[target].vx += dt * Fx;
+  bodies[target].vy += dt * Fy;
+  bodies[target].vz += dt * Fz;
+  return nInteractions;
 }
 
-void bodyForce(Body *p, float dt, int n) {
+int allInteractionsDFT(std::vector<DFTNode> dft, Body *bodies, int target,
+                       int dt, int nBodies) {
+  // iterate over all bodies (targets)
+  int nInteractions = 0;
+  float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
+  for (int j = 0; j < dft.size(); j++) {
+    if (dft[j].isLeaf) {
+      for (int bIndex : dft[j].bodies) {
+        nInteractions++;
+        float dx = bodies[bIndex].x - bodies[target].x;
+        float dy = bodies[bIndex].y - bodies[target].y;
+        float dz = bodies[bIndex].z - bodies[target].z;
+        float distSqr = dx * dx + dy * dy + dz * dz + SOFTENING;
+        float invDist = 1.0f / sqrtf(distSqr);
+        float invDist3 = invDist * invDist * invDist;
+
+        Fx += dx * bodies[bIndex].m * invDist3;
+        Fy += dy * bodies[bIndex].m * invDist3;
+        Fz += dz * bodies[bIndex].m * invDist3;
+      }
+    }
+  }
+  bodies[target].vx += dt * Fx;
+  bodies[target].vy += dt * Fy;
+  bodies[target].vz += dt * Fz;
+  return nInteractions;
+}
+
+int allInteractionsDS(Body *bodies, int target, int dt, int nBodies) {
+  int nInteractions = 0;
+
+  // iterate over all bodies (targets)
+  float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
+  for (int j = 0; j < nBodies; j++) {
+    nInteractions++;
+    float dx = bodies[j].x - bodies[target].x;
+    float dy = bodies[j].y - bodies[target].y;
+    float dz = bodies[j].z - bodies[target].z;
+    float distSqr = dx * dx + dy * dy + dz * dz + SOFTENING;
+    float invDist = 1.0f / sqrtf(distSqr);
+    float invDist3 = invDist * invDist * invDist;
+
+    Fx += dx * bodies[j].m * invDist3;
+    Fy += dy * bodies[j].m * invDist3;
+    Fz += dz * bodies[j].m * invDist3;
+  }
+  bodies[target].vx += dt * Fx;
+  bodies[target].vy += dt * Fy;
+  bodies[target].vz += dt * Fz;
+  return nInteractions;
+}
+void bodyForce(Body *p, float dt, int n, std::vector<DFTNode> dft) {
   int mid = n / 2;
-  bodyForceRange(p, dt, 0, mid, n);
-  bodyForceRange(p, dt, mid, n, n);
+  int totalInteractions = 0;
+  for (int i = 0; i < n; i++) {
+    totalInteractions += allInteractionsDS(p, i, dt, n);
+    // totalInteractions += allInteractionsDFT(dft, p, i, dt, n);
+  }
+
+  printf("Total interactions: %d\n", totalInteractions);
 }
 
 void integratePositionsRange(Body *p, float dt, int start, int end) {
@@ -87,12 +160,12 @@ void integratePositions(Body *p, float dt, int n) {
 int main(const int argc, const char **argv) {
   printf("NBody using Octree\n");
   PhiloxEngine rng(2025);
-  int nBodies = 2;
+  int nBodies = 2000;
   if (argc > 1)
     nBodies = atoi(argv[1]);
 
   const float dt = 0.01f; // time step
-  const int nIters = 10;  // simulation iterations
+  const int nIters = 1;   // simulation iterations
 
   printf("Simulating %d bodies\n", nBodies);
   // Allocate memory for nBodies
@@ -100,53 +173,66 @@ int main(const int argc, const char **argv) {
 
   // Initialize positions, velocities, and masses (7 values per body)
   int maxkeylength = randomizeBodies(rng, p, nBodies);
-  printf("Randomized bodies with maxkeylength = %d\n", maxkeylength);
+  // printf("Randomized bodies with maxkeylength = %d\n", maxkeylength);
 
   Octree *octree = new Octree(maxkeylength);
+  // printf("Octree created with %d bodies\n", nBodies);
+  int nUniqueLeaves = 0;
   for (int i = 0; i < nBodies; i++) {
-    octree->insert(p[i]);
+    nUniqueLeaves += octree->insert(p[i]);
   }
 
-  octree->printTree(octree->root, 0);
+  // octree->printTree(octree->root, 0);
 
   std::vector<DFTNode> dft;
   octree->buildDFT(dft);
 
-  //   double totalTime = 0.0;
-  //   ctimer_t timer;
+  printf("Octree built with %d buckets\n", nUniqueLeaves);
 
-  //   for (int iter = 1; iter <= nIters; iter++) {
-  //     ctimer_start(&timer);
+  double totalTime = 0.0;
+  ctimer_t timer;
 
-  //     // Compute interbody forces using cilk_scope with spawn.
-  //     bodyForce(p, dt, nBodies);
+  for (int iter = 1; iter <= nIters; iter++) {
+    ctimer_start(&timer);
 
-  //     // Integrate positions concurrently by dividing the work.
-  //     integratePositions(p, dt, nBodies);
+    // Compute interbody forces using cilk_scope with spawn.
+    bodyForce(p, dt, nBodies, dft);
 
-  //     ctimer_stop(&timer);
-  //     ctimer_measure(&timer);
-  //     double tElapsed = timespec_sec(timer.elapsed);
+    // Integrate positions concurrently by dividing the work.
+    integratePositions(p, dt, nBodies);
 
-  //     if (iter > 1) // skip the first iteration as warm-up
-  //       totalTime += tElapsed;
+    ctimer_stop(&timer);
+    ctimer_measure(&timer);
+    double tElapsed = timespec_sec(timer.elapsed);
 
-  // #ifndef SHMOO
-  //     printf("Iteration %d: %.3f seconds\n", iter, tElapsed);
-  // #endif
-  //   }
+    if (iter > 1) // skip the first iteration as warm-up
+      totalTime += tElapsed;
 
-  //   double avgTime = totalTime / (double)(nIters - 1);
-  // #ifdef SHMOO
-  //   printf("%d, %0.3f\n", nBodies, 1e-9 * nBodies * nBodies / avgTime);
-  // #else
-  //   printf("Average time for iterations 2 through %d: %.3f seconds.\n",
-  //   nIters,
-  //          avgTime);
-  //   printf("%d Bodies: average %0.3f Billion Interactions / second\n",
-  //   nBodies,
-  //          1e-9 * nBodies * nBodies / avgTime);
-  // #endif
+#ifndef SHMOO
+    printf("Iteration %d: %.3f seconds\n", iter, tElapsed);
+#endif
+  }
+
+  // print bodies after to a file
+  FILE *file = fopen("bodiesAfterDS.txt", "a");
+  if (file) {
+    for (int i = 0; i < nBodies; i++) {
+      fprintf(file, "Body %d: x=%f, y=%f, z=%f\n", i, p[i].x, p[i].y, p[i].z);
+    }
+    fclose(file);
+  } else {
+    printf("Error opening file for writing.\n");
+  }
+
+  double avgTime = totalTime / (double)(nIters - 1);
+#ifdef SHMOO
+  printf("%d, %0.3f\n", nBodies, 1e-9 * nBodies * nBodies / avgTime);
+#else
+  printf("Average time for iterations 2 through %d: %.3f seconds.\n", nIters,
+         avgTime);
+  printf("%d Bodies: average %0.3f Billion Interactions / second\n", nBodies,
+         1e-9 * nBodies * nBodies / avgTime);
+#endif
 
   delete[] p;
   return 0;
