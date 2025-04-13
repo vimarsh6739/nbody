@@ -28,18 +28,10 @@ mutable struct Node
     parent::Union{Node, Nothing}
     children::Vector{Union{Node, Nothing}}
     whichChildren::UInt8
-    subTreeSize::Int
     
     function Node(key::Int, isLeaf::Bool)
-        new(key, isLeaf, nothing, fill(nothing, 8), 0, 1)
+        new(key, isLeaf, nothing, fill(nothing, 8), 0)
     end
-end
-
-struct DFTNode
-    index::Int
-    key::Int
-    isLeaf::Bool
-    autorope::Int
 end
 
 mutable struct Octree
@@ -56,17 +48,30 @@ mutable struct Octree
     end
 end
 
-struct PhiloxEngine
-    seed::UInt32
-    rng::MersenneTwister
+mutable struct LCGRandomEngine
+    state::UInt32
     
-    function PhiloxEngine(seed::Int)
-        new(UInt32(seed), MersenneTwister(seed))
+    function LCGRandomEngine(seed::Int)
+        new(UInt32(seed))
     end
 end
 
-Base.rand(rng::PhiloxEngine) = rand(rng.rng)
-Base.rand(rng::PhiloxEngine, range::UnitRange{Int}) = rand(rng.rng, range)
+function Base.rand(rng::LCGRandomEngine)
+    a = UInt32(1664525)
+    c = UInt32(1013904223)
+    
+    rng.state = a * rng.state + c
+    
+    return rng.state / (1.0 * typemax(UInt32))
+end
+
+function Base.rand(rng::LCGRandomEngine, range::UnitRange{Int})
+    width = range.stop - range.start + 1
+    
+    r = rand(rng) * width
+    
+    return range.start + floor(Int, r)
+end
 
 function getKeyNoPrepend(body::Body)
     key = 0
@@ -169,107 +174,6 @@ function printTree(node::Union{Node, Nothing}, level::Int)
     end
 end
 
-function setSubtreeSizes!(node::Union{Node, Nothing})
-    if node === nothing
-        return
-    end
-    
-    if node.isLeaf
-        node.subTreeSize = 1
-        return
-    end
-    
-    node.subTreeSize = 1
-    
-    for i in 0:7
-        if (node.whichChildren & (1 << i)) != 0
-            setSubtreeSizes!(node.children[i+1])
-            node.subTreeSize += node.children[i+1].subTreeSize
-        end
-    end
-end
-
-function traverse!(node::Union{Node, Nothing}, nodes::Vector{DFTNode})
-    if node === nothing
-        return
-    end
-    
-    dftNode = DFTNode(
-        length(nodes) + 1,
-        node.key,
-        node.isLeaf,
-        length(nodes) + node.subTreeSize
-    )
-    
-    push!(nodes, dftNode)
-    
-    if !node.isLeaf
-        for i in 0:7
-            if (node.whichChildren & (1 << i)) != 0
-                traverse!(node.children[i+1], nodes)
-            end
-        end
-    end
-end
-
-function buildDFT(octree::Octree)
-    nodes = DFTNode[]
-    setSubtreeSizes!(octree.root)
-    traverse!(octree.root, nodes)
-    
-    print("DFT: ")
-    for (i, node) in enumerate(nodes)
-        autoropeNext = node.autorope
-        if autoropeNext > length(nodes)
-            print("$(node.key) (-1), ")
-        else
-            print("$(node.key) ($(nodes[autoropeNext].key)), ")
-        end
-    end
-    println()
-    
-    return nodes
-end
-
-function randomizeBodies(rng::PhiloxEngine, bodies::Vector{Body}, n::Int)
-    maxKeyLength = 0
-    
-    for i in 1:n
-        x = rand(rng, 0:POSMAX-1)
-        y = rand(rng, 0:POSMAX-1)
-        z = rand(rng, 0:POSMAX-1)
-        
-        tempBody = Body(x, y, z, 0.0, 0.0, 0.0, 0.0)
-        
-        key = getKeyNoPrepend(tempBody)
-        keyLength = binaryLength(key)
-        
-        if keyLength > maxKeyLength
-            maxKeyLength = keyLength
-        end
-        
-        vx = rand(rng) * 2 - 1
-        vy = rand(rng) * 2 - 1
-        vz = rand(rng) * 2 - 1
-        m = rand(rng) + 0.1
-        
-        bodies[i] = Body(x, y, z, vx, vy, vz, m, key)
-    end
-    
-    prepend = 1 << maxKeyLength
-    println("Using prepend value: $prepend (2^$maxKeyLength)")
-    
-    for i in 1:n
-        bodies[i] = Body(
-            bodies[i].x, bodies[i].y, bodies[i].z,
-            bodies[i].vx, bodies[i].vy, bodies[i].vz,
-            bodies[i].m, bodies[i].key + prepend
-        )
-    end
-    
-    return maxKeyLength + 1
-end
-
 function bodyForceRange!(bodies::Vector{Body}, dt::Float64, start::Int, finish::Int, n::Int)
     for i in start:finish
         Fx, Fy, Fz = 0.0, 0.0, 0.0
@@ -332,7 +236,7 @@ end
 function nbody_simulation(nBodies::Int = 2)
     println("NBody using Octree")
     
-    rng = PhiloxEngine(2025)
+    rng = LCGRandomEngine(2025)
     
     dt = 0.01
     nIters = 10
@@ -355,8 +259,8 @@ function nbody_simulation(nBodies::Int = 2)
     end
     
     printTree(octree.root, 0)
-    
-    dft = buildDFT(octree)
+
+    GC.gc()
     
     totalTime = 0.0
     
@@ -413,6 +317,45 @@ function nbody_simulation(nBodies::Int = 2)
         println("Average time for iterations 2 through $nIters: $avgTime seconds.")
         println("$nBodies Bodies: average $(1e-9 * nBodies * nBodies / avgTime) Billion Interactions / second")
     end
+end
+
+function randomizeBodies(rng::LCGRandomEngine, bodies::Vector{Body}, n::Int)
+    maxKeyLength = 0
+    
+    for i in 1:n
+        x = rand(rng, 0:POSMAX-1)
+        y = rand(rng, 0:POSMAX-1)
+        z = rand(rng, 0:POSMAX-1)
+        
+        tempBody = Body(x, y, z, 0.0, 0.0, 0.0, 0.0)
+        
+        key = getKeyNoPrepend(tempBody)
+        keyLength = binaryLength(key)
+        
+        if keyLength > maxKeyLength
+            maxKeyLength = keyLength
+        end
+        
+        vx = rand(rng) * 2 - 1
+        vy = rand(rng) * 2 - 1
+        vz = rand(rng) * 2 - 1
+        m = rand(rng) + 0.1
+        
+        bodies[i] = Body(x, y, z, vx, vy, vz, m, key)
+    end
+    
+    prepend = 1 << maxKeyLength
+    println("Using prepend value: $prepend (2^$maxKeyLength)")
+    
+    for i in 1:n
+        bodies[i] = Body(
+            bodies[i].x, bodies[i].y, bodies[i].z,
+            bodies[i].vx, bodies[i].vy, bodies[i].vz,
+            bodies[i].m, bodies[i].key + prepend
+        )
+    end
+    
+    return maxKeyLength + 1
 end
 
 function main()
