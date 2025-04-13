@@ -6,7 +6,9 @@
 #include <assert.h>
 #include <math.h>
 
-Node::Node(int key, bool isLeaf) {
+#define SHIFT_DIGITS 5
+
+Node::Node(Key key, bool isLeaf) {
   this->key = key;
   this->isLeaf = isLeaf;
   this->subTreeSize = 1;
@@ -29,9 +31,23 @@ void Octree::addChild(Node *parent, Node *child, int index, bool isLeaf,
   parent->whichChildren |= 1 << index;
 }
 
-void Octree::insert(Body body) {
+void Octree::splitNode(Node *current, int index, int nLevels, int level) {
+  Node *child = current->children[index];
+  Key shifted = child->key >> (3 * (nLevels - level - 1));
+  int childIndex = (int)shifted & 0x7;
+  current->children[index] = new Node(shifted, false);
+  current->children[index]->parent = current;
+
+  child->parent = current->children[index];
+  current->children[index]->children[childIndex] = child;
+  current->children[index]->whichChildren |= 1 << childIndex;
+}
+
+int Octree::insert(Body body) {
   Node *current = root;
-  int key = body.key;
+  Key key = body.key;
+
+  int arrIndex = body.index;
 
   assert(key >> (leafLength - 1) == 1);  // check that all keys are prepended
   assert(nLevels * 3 == leafLength - 1); // check nlevels
@@ -40,10 +56,25 @@ void Octree::insert(Body body) {
   int level = 0;
   while (level < nLevels - 1) {
     Key shifted = key >> (3 * (nLevels - level - 1));
-    int index = shifted & 0x7;
+    int index = (int)shifted & 0x7;
+
+    if (current->whichChildren == 0) {
+      break;
+    }
 
     if (current->children[index] == NULL) {
       addChild(current, current->children[index], index, false, shifted);
+
+      for (int i = 0; i < 8; i++) {
+        if (current->children[i] != NULL && current->children[i]->isLeaf) {
+          splitNode(current, i, nLevels, level);
+        }
+      }
+    } else {
+      Node *child = current->children[index];
+      if (child->isLeaf) {
+        splitNode(current, index, nLevels, level);
+      }
     }
 
     current = current->children[index];
@@ -51,12 +82,22 @@ void Octree::insert(Body body) {
   }
 
   // insert leaf
-  assert(level == nLevels - 1);
-  int index = key & 0x7;
+  // assert(level == nLevels - 1);
+  int index = (key >> (3 * (nLevels - level - 1))) & 0x7;
 
   // otherwise have to handle duplicate keys
-  assert(current->children[index] == NULL);
-  addChild(current, current->children[index], index, true, key);
+  if (current->children[index] == NULL) {
+    addChild(current, current->children[index], index, true, key);
+    current->children[index]->bodies.push_back(arrIndex);
+
+    return 1;
+
+  } else {
+    current->children[index]->bodies.push_back(arrIndex);
+    if (current->children[index]->bodies.size() > 1) {
+    }
+    return 0;
+  }
 };
 
 void Octree::printTree(Node *node, int level) {
@@ -83,23 +124,35 @@ std::string binaryString(Key k) {
   return s + std::to_string(k % 2);
 }
 
-int getKeyNoPrepend(Body body) {
-  int key = 0;
+Key getKeyNoPrepend(Body body) {
+  Key key = 0;
 
-  // interleave x, y, z bits
-  int x = body.x;
-  int y = body.y;
-  int z = body.z;
+  float x = body.x;
+  float y = body.y;
+  float z = body.z;
+
+  // shift and trunacte
+  Key shift = 1 << SHIFT_DIGITS;
+  int xint = static_cast<int>(x * shift);
+  int yint = static_cast<int>(y * shift);
+  int zint = static_cast<int>(z * shift);
+
+  // Check for overflow
+  if (xint < 0 || yint < 0 || zint < 0) {
+    fprintf(stderr, "Error: Integer overflow detected in getKeyNoPrepend\n");
+    exit(EXIT_FAILURE);
+  }
 
   int i = 0;
-  while (x || y || z) {
-    key |= (body.x & (1 << i)) << i;
-    key |= (body.y & (1 << i)) << (i + 1);
-    key |= (body.z & (1 << i)) << (i + 2);
+  while (xint || yint || zint) {
+    key |= (xint & (1 << i)) << i;
+    key |= (yint & (1 << i)) << (i + 1);
+    key |= (zint & (1 << i)) << (i + 2);
 
-    x = x >> 1;
-    y = y >> 1;
-    z = z >> 1;
+    xint = xint >> 1;
+    yint = yint >> 1;
+    zint = zint >> 1;
+
     i += 3;
   }
 
@@ -110,7 +163,7 @@ int getKeyNoPrepend(Body body) {
 }
 
 // should be a multiple of 3
-int binaryLength(int n) {
+int binaryLength(Key n) {
   if (n == 0)
     return 0;
 
@@ -142,15 +195,15 @@ void Octree::buildDFT(std::vector<DFTNode> &nodes) {
   setSubtreeSizes(this->root);
   traverse(this->root, nodes);
 
-  printf("DFT: ");
-  for (int i = 0; i < nodes.size(); i++) {
-    int autoropeNext = nodes[i].autorope;
-    if (autoropeNext >= nodes.size())
-      printf("%d (-1), ", nodes[i].key);
-    else
-      printf("%d (%d), ", nodes[i].key, nodes[autoropeNext].key);
-  }
-  printf("\n");
+  // printf("DFT: ");
+  // for (int i = 0; i < nodes.size(); i++) {
+  //   int autoropeNext = nodes[i].autorope;
+  //   if (autoropeNext >= nodes.size())
+  //     printf("%d (-1), ", nodes[i].key);
+  //   else
+  //     printf("%d (%d), ", nodes[i].key, nodes[autoropeNext].key);
+  // }
+  // printf("\n");
 }
 
 void Octree::traverse(Node *node, std::vector<DFTNode> &nodes) {
@@ -165,6 +218,8 @@ void Octree::traverse(Node *node, std::vector<DFTNode> &nodes) {
   dftNode.autorope =
       dftNode.index +
       node->subTreeSize; // if autorope is out of bounds, traversal is donexw
+
+  dftNode.bodies = node->bodies;
 
   nodes.push_back(dftNode);
 
