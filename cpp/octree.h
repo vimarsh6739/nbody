@@ -29,6 +29,10 @@ public:
 
   int subTreeSize; // used to build autoropes
 
+  float x, y, z; // center of mass of the node
+  float mass;    // total mass of the node
+  int nBodies;
+
   Node(Key key, bool isLeaf);
 };
 
@@ -36,7 +40,11 @@ typedef struct DFTNode {
   int index;
   Key key;
   bool isLeaf;
-  int autorope;
+  int autorope; // index of the next node in the autorope
+
+  float x, y, z; // center of mass of the node
+  float mass;    // total mass of the node
+  int nBodies;
 
   std::vector<int> bodies; // indeces into the bodies array
 };
@@ -51,9 +59,9 @@ public:
   void addChild(Node *parent, Node *child, int index, bool isLeaf, int key);
   int insert(Body body);
   void printTree(Node *node, int level);
-  void buildDFT(std::vector<DFTNode> &nodes);
+  void buildDFT(std::vector<DFTNode> &nodes, Body *bodies);
   void traverse(Node *node, std::vector<DFTNode> &nodes);
-  void setSubtreeSizes(Node *node);
+  void setSubtreeSizes(Node *node, Body *bodies);
   void splitNode(Node *current, int index, int nLevels, int level);
 };
 

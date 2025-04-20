@@ -10,6 +10,23 @@
 #define SOFTENING 1e-9f
 #define POSMAX 100
 
+bool USE_TREE = true; // use tree or list
+bool USE_BH = true;   // use barnes hut or not
+float MAC_PARAM = 1;  // MAC parameter
+
+bool MAC(float target_x, float target_y, float target_z, float x, float y,
+         float z, float mass) {
+
+  float distance =
+      sqrtf((target_x - x) * (target_x - x) + (target_y - y) * (target_y - y) +
+            (target_z - z) * (target_z - z));
+  float source_mass = mass;
+
+  bool result = distance > MAC_PARAM;
+
+  return distance > MAC_PARAM;
+}
+
 // Randomize the positions and velocities in the range [-1, 1],
 // and assign a mass (every 7th float) in the range [0.1, 1.0].
 int randomizeBodies(PhiloxEngine &rng, Body *bodies, int n) {
@@ -73,8 +90,23 @@ int MACInteractionsDFT(std::vector<DFTNode> dft, Body *bodies, int target,
         Fy += dy * bodies[bIndex].m * invDist3;
         Fz += dz * bodies[bIndex].m * invDist3;
       }
+    } else if (MAC(bodies[target].x, bodies[target].y, bodies[target].z,
+                   dft[j].x, dft[j].y, dft[j].z, dft[j].mass)) {
+      nInteractions++;
+      float dx = dft[j].x - bodies[target].x;
+      float dy = dft[j].y - bodies[target].y;
+      float dz = dft[j].z - bodies[target].z;
+      float distSqr = dx * dx + dy * dy + dz * dz + SOFTENING;
+      float invDist = 1.0f / sqrtf(distSqr);
+      float invDist3 = invDist * invDist * invDist;
+
+      Fx += dx * dft[j].mass * invDist3;
+      Fy += dy * dft[j].mass * invDist3;
+      Fz += dz * dft[j].mass * invDist3;
+      j = dft[j].autorope - 1; // -1 because we increment j in the for loop
     }
   }
+
   bodies[target].vx += dt * Fx;
   bodies[target].vy += dt * Fy;
   bodies[target].vz += dt * Fz;
@@ -136,8 +168,12 @@ void bodyForce(Body *p, float dt, int n, std::vector<DFTNode> dft) {
   int mid = n / 2;
   int totalInteractions = 0;
   for (int i = 0; i < n; i++) {
-    totalInteractions += allInteractionsDS(p, i, dt, n);
-    // totalInteractions += allInteractionsDFT(dft, p, i, dt, n);
+    if (USE_TREE && USE_BH)
+      totalInteractions += MACInteractionsDFT(dft, p, i, dt, n);
+    else if (USE_TREE)
+      totalInteractions += allInteractionsDFT(dft, p, i, dt, n);
+    else
+      totalInteractions += allInteractionsDS(p, i, dt, n);
   }
 
   printf("Total interactions: %d\n", totalInteractions);
@@ -157,41 +193,10 @@ void integratePositions(Body *p, float dt, int n) {
   integratePositionsRange(p, dt, mid, n);
 }
 
-int main(const int argc, const char **argv) {
-  printf("NBody using Octree\n");
-  PhiloxEngine rng(2025);
-  int nBodies = 2000;
-  if (argc > 1)
-    nBodies = atoi(argv[1]);
-
-  const float dt = 0.01f; // time step
-  const int nIters = 1;   // simulation iterations
-
-  printf("Simulating %d bodies\n", nBodies);
-  // Allocate memory for nBodies
-  Body *p = new Body[nBodies];
-
-  // Initialize positions, velocities, and masses (7 values per body)
-  int maxkeylength = randomizeBodies(rng, p, nBodies);
-  // printf("Randomized bodies with maxkeylength = %d\n", maxkeylength);
-
-  Octree *octree = new Octree(maxkeylength);
-  // printf("Octree created with %d bodies\n", nBodies);
-  int nUniqueLeaves = 0;
-  for (int i = 0; i < nBodies; i++) {
-    nUniqueLeaves += octree->insert(p[i]);
-  }
-
-  // octree->printTree(octree->root, 0);
-
-  std::vector<DFTNode> dft;
-  octree->buildDFT(dft);
-
-  printf("Octree built with %d buckets\n", nUniqueLeaves);
-
+void nbodyIterate(Body *p, float dt, int nBodies, std::vector<DFTNode> dft,
+                  int nIters) {
   double totalTime = 0.0;
   ctimer_t timer;
-
   for (int iter = 1; iter <= nIters; iter++) {
     ctimer_start(&timer);
 
@@ -213,17 +218,6 @@ int main(const int argc, const char **argv) {
 #endif
   }
 
-  // print bodies after to a file
-  FILE *file = fopen("bodiesAfterDS.txt", "a");
-  if (file) {
-    for (int i = 0; i < nBodies; i++) {
-      fprintf(file, "Body %d: x=%f, y=%f, z=%f\n", i, p[i].x, p[i].y, p[i].z);
-    }
-    fclose(file);
-  } else {
-    printf("Error opening file for writing.\n");
-  }
-
   double avgTime = totalTime / (double)(nIters - 1);
 #ifdef SHMOO
   printf("%d, %0.3f\n", nBodies, 1e-9 * nBodies * nBodies / avgTime);
@@ -233,7 +227,120 @@ int main(const int argc, const char **argv) {
   printf("%d Bodies: average %0.3f Billion Interactions / second\n", nBodies,
          1e-9 * nBodies * nBodies / avgTime);
 #endif
+}
+
+void printBodiesToFile(Body *p, int nBodies) {
+  FILE *file;
+  if (USE_TREE)
+    if (USE_BH)
+      file = fopen("bodiesAfterBH.txt", "a");
+    else
+      file = fopen("bodiesAfterDFT.txt", "a");
+  else
+    file = fopen("bodiesAfterDS.txt", "a");
+
+  if (file) {
+    for (int i = 0; i < nBodies; i++) {
+      fprintf(file, "Body %d: x=%f, y=%f, z=%f\n", i, p[i].x, p[i].y, p[i].z);
+    }
+    fclose(file);
+  } else {
+    printf("Error opening file for writing.\n");
+  }
+}
+
+void checkAccuracy(Body *p, Body *orig, int nBodies) {
+  printf("-----------------------------------------------\n");
+  printf("ACCURACY CHECK AGAINST DS\n");
+
+  USE_TREE = false;
+  USE_BH = false;
+
+  nbodyIterate(orig, 0.01f, nBodies, std::vector<DFTNode>(), 1);
+
+  float maxError = 0.0f;
+  for (int i = 0; i < nBodies; i++) {
+
+    float dx = p[i].x - orig[i].x;
+    float dy = p[i].y - orig[i].y;
+    float dz = p[i].z - orig[i].z;
+    float error = sqrtf(dx * dx + dy * dy + dz * dz);
+    if (error > maxError) {
+      maxError = error;
+    }
+  }
+  printf("Max error: %f\n", maxError);
+}
+
+int main(const int argc, const char **argv) {
+  printf("NBody Simulation\n");
+
+  int nBodies = 2000;
+  if (argc > 1)
+    nBodies = atoi(argv[1]);
+
+  if (argc > 2) {
+    nBodies = atoi(argv[1]);
+    const char *method = argv[2];
+    if (strcmp(method, "DS") == 0) {
+      USE_TREE = false;
+    } else if (strcmp(method, "DFT") == 0) {
+      USE_TREE = true;
+      USE_BH = false;
+    } else if (strcmp(method, "MAC") == 0) {
+      USE_TREE = true;
+      USE_BH = true;
+    } else {
+      printf("Unknown method: %s\n", method);
+      return -1;
+    }
+  }
+
+  // TODO: other parameters we might want to control:
+  // - SHIFT_DIGITS (controls how many keys/buckets are created)
+  // - MAC_PARAM (controls the MAC parameter)
+  // - SOFTENING (controls the softening factor)
+
+  printf(" - %s method \n - %d bodies\n",
+         USE_TREE ? (USE_BH ? "MAC" : "DFT") : "DS", nBodies);
+  printf("-----------------------------------------------\n");
+
+  const float dt = 0.01f; // time step
+  const int nIters = 1;   // simulation iterations
+
+  // Allocate memory for nBodies
+  Body *p = new Body[nBodies];
+
+  // Initialize positions, velocities, and masses (7 values per body)
+  PhiloxEngine rng(2025);
+  int maxkeylength = randomizeBodies(rng, p, nBodies);
+
+  // make a copy of bodies for accuracy check
+  Body *pCopy = new Body[nBodies];
+  for (int i = 0; i < nBodies; i++) {
+    pCopy[i] = p[i];
+  }
+
+  std::vector<DFTNode> dft;
+  Octree *octree = new Octree(maxkeylength);
+
+  if (USE_TREE) {
+    int nUniqueLeaves = 0;
+    for (int i = 0; i < nBodies; i++) {
+      nUniqueLeaves += octree->insert(p[i]);
+    }
+
+    octree->buildDFT(dft, p);
+    printf("Octree built with %d buckets (leaves with unique key)\n",
+           nUniqueLeaves);
+    // octree->printTree(octree->root, 0);
+  }
+
+  nbodyIterate(p, dt, nBodies, dft, nIters);
+  checkAccuracy(p, pCopy, nBodies);
 
   delete[] p;
+  delete[] pCopy;
+  delete octree;
   return 0;
 }

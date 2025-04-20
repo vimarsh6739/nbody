@@ -6,7 +6,7 @@
 #include <assert.h>
 #include <math.h>
 
-#define SHIFT_DIGITS 5
+#define SHIFT_DIGITS 20
 
 Node::Node(Key key, bool isLeaf) {
   this->key = key;
@@ -18,7 +18,6 @@ Octree::Octree(int maxKeyLength) {
   root = new Node(1, false);
   leafLength = maxKeyLength;
   nLevels = maxKeyLength / 3;
-  printf("Octree with %d levels\n", nLevels);
 }
 
 void Octree::addChild(Node *parent, Node *child, int index, bool isLeaf,
@@ -174,25 +173,59 @@ int binaryLength(Key n) {
   return length;
 }
 
-void Octree::setSubtreeSizes(Node *node) {
+void Octree::setSubtreeSizes(Node *node, Body *bodies) {
   if (node == NULL)
     return;
 
+  float x = 0.0f, y = 0.0f, z = 0.0f;
+  float mass = 0.0f;
+
   if (node->isLeaf) {
     node->subTreeSize = 1;
+
+    // compute center of mass and relevant aggregate information
+
+    if (node->bodies.size() == 0) {
+      return;
+    }
+
+    for (int i = 0; i < node->bodies.size(); i++) {
+      mass += bodies[node->bodies[i]].m;
+      x += bodies[node->bodies[i]].x;
+      y += bodies[node->bodies[i]].y;
+      z += bodies[node->bodies[i]].z;
+    }
+    node->x = x / node->bodies.size();
+    node->y = y / node->bodies.size();
+    node->z = z / node->bodies.size();
+    node->mass = mass;
+    node->nBodies = node->bodies.size();
     return;
   }
 
   for (int i = 0; i < 8; i++) {
     if (node->whichChildren & (1 << i)) {
-      setSubtreeSizes(node->children[i]);
+      setSubtreeSizes(node->children[i], bodies);
       node->subTreeSize += node->children[i]->subTreeSize;
+
+      x += node->children[i]->x * node->children[i]->nBodies;
+      y += node->children[i]->y * node->children[i]->nBodies;
+      z += node->children[i]->z * node->children[i]->nBodies;
+      mass += node->children[i]->mass;
+      node->nBodies += node->children[i]->nBodies;
     }
+  }
+
+  if (node->nBodies > 0) {
+    node->x = x / node->nBodies;
+    node->y = y / node->nBodies;
+    node->z = z / node->nBodies;
+    node->mass = mass;
   }
 }
 
-void Octree::buildDFT(std::vector<DFTNode> &nodes) {
-  setSubtreeSizes(this->root);
+void Octree::buildDFT(std::vector<DFTNode> &nodes, Body *bodies) {
+  setSubtreeSizes(this->root, bodies);
   traverse(this->root, nodes);
 
   // printf("DFT: ");
@@ -214,6 +247,12 @@ void Octree::traverse(Node *node, std::vector<DFTNode> &nodes) {
   dftNode.key = node->key;
   dftNode.isLeaf = node->isLeaf;
   dftNode.index = nodes.size();
+
+  dftNode.x = node->x;
+  dftNode.y = node->y;
+  dftNode.z = node->z;
+  dftNode.mass = node->mass;
+  dftNode.nBodies = node->nBodies;
 
   dftNode.autorope =
       dftNode.index +
