@@ -54,7 +54,7 @@ int randomizeBodies(PhiloxEngine &rng, Body *bodies, int n) {
 }
 
 int MACInteractionsDFT(std::vector<DFTNode> dft, Body *bodies, int target,
-                       int dt, int nBodies) {
+                       float dt, int nBodies) {
   // iterate over all bodies (targets)
   int nInteractions = 0;
   float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
@@ -82,7 +82,7 @@ int MACInteractionsDFT(std::vector<DFTNode> dft, Body *bodies, int target,
 }
 
 int allInteractionsDFT(std::vector<DFTNode> dft, Body *bodies, int target,
-                       int dt, int nBodies) {
+                       float dt, int nBodies) {
   // iterate over all bodies (targets)
   int nInteractions = 0;
   float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
@@ -109,7 +109,7 @@ int allInteractionsDFT(std::vector<DFTNode> dft, Body *bodies, int target,
   return nInteractions;
 }
 
-int allInteractionsDS(Body *bodies, int target, int dt, int nBodies) {
+int allInteractionsDS(Body *bodies, int target, float dt, int nBodies) {
   int nInteractions = 0;
 
   // iterate over all bodies (targets)
