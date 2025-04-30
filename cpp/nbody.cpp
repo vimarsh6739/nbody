@@ -7,12 +7,14 @@
 #include <cstdlib>
 #include <random>
 
+#include <cilk.h>
+
 #define SOFTENING 1e-9f
 #define POSMAX 100
 
 bool USE_TREE = true; // use tree or list
 bool USE_BH = true;   // use barnes hut or not
-float MAC_PARAM = 1;  // MAC parameter
+float MAC_PARAM = .5; // MAC parameter
 
 bool MAC(float target_x, float target_y, float target_z, float x, float y,
          float z, float mass) {
@@ -24,7 +26,7 @@ bool MAC(float target_x, float target_y, float target_z, float x, float y,
 
   bool result = distance > MAC_PARAM;
 
-  return distance > MAC_PARAM;
+  return distance / source_mass > MAC_PARAM;
 }
 
 // Randomize the positions and velocities in the range [-1, 1],
@@ -51,14 +53,6 @@ int randomizeBodies(PhiloxEngine &rng, Body *bodies, int n) {
     body.vy = (v_dis(rng)) * 2 - 1;
     body.vz = (v_dis(rng)) * 2 - 1;
     body.m = (v_dis(rng)) + 0.1f;
-
-    FILE *file = fopen("bodiesBefore.txt", "a");
-    if (file) {
-      fprintf(file, "Body %d: x=%f, y=%f, z=%f\n", i, body.x, body.y, body.z);
-      fclose(file);
-    } else {
-      printf("Error opening file for writing.\n");
-    }
   }
 
   // prepend all keys
@@ -118,6 +112,7 @@ int allInteractionsDFT(std::vector<DFTNode> dft, Body *bodies, int target,
   // iterate over all bodies (targets)
   int nInteractions = 0;
   float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
+
   for (int j = 0; j < dft.size(); j++) {
     if (dft[j].isLeaf) {
       for (int bIndex : dft[j].bodies) {
@@ -166,17 +161,17 @@ int allInteractionsDS(Body *bodies, int target, float dt, int nBodies) {
 }
 void bodyForce(Body *p, float dt, int n, std::vector<DFTNode> dft) {
   int mid = n / 2;
-  int totalInteractions = 0;
-  for (int i = 0; i < n; i++) {
+  printf("DFT size: %ld\n", dft.size());
+  cilk_for(int i = 0; i < n; i++) {
     if (USE_TREE && USE_BH)
-      totalInteractions += MACInteractionsDFT(dft, p, i, dt, n);
+      MACInteractionsDFT(dft, p, i, dt, n);
     else if (USE_TREE)
-      totalInteractions += allInteractionsDFT(dft, p, i, dt, n);
+      allInteractionsDFT(dft, p, i, dt, n);
     else
-      totalInteractions += allInteractionsDS(p, i, dt, n);
+      allInteractionsDS(p, i, dt, n);
   }
 
-  printf("Total interactions: %d\n", totalInteractions);
+  // printf("Total interactions: %ld\n", totalInteractions);
 }
 
 void integratePositionsRange(Body *p, float dt, int start, int end) {
@@ -193,15 +188,33 @@ void integratePositions(Body *p, float dt, int n) {
   integratePositionsRange(p, dt, mid, n);
 }
 
-void nbodyIterate(Body *p, float dt, int nBodies, std::vector<DFTNode> dft,
-                  int nIters) {
+void nbodyIterate(Body *p, float dt, int nBodies, int nIters,
+                  int maxkeylength) {
   double totalTime = 0.0;
   ctimer_t timer;
   for (int iter = 1; iter <= nIters; iter++) {
+
+    std::vector<DFTNode> dft;
+    Octree *octree = new Octree(maxkeylength);
+
+    if (USE_TREE) {
+      int nUniqueLeaves = 0;
+      for (int i = 0; i < nBodies; i++) {
+        nUniqueLeaves += octree->insert(p[i]);
+      }
+
+      octree->buildDFT(dft, p);
+      printf("Octree built with %d buckets (leaves with unique key)\n",
+             nUniqueLeaves);
+      // octree->printTree(octree->root, 0);
+    }
+
     ctimer_start(&timer);
 
     // Compute interbody forces using cilk_scope with spawn.
     bodyForce(p, dt, nBodies, dft);
+
+    delete octree;
 
     // Integrate positions concurrently by dividing the work.
     integratePositions(p, dt, nBodies);
@@ -256,7 +269,7 @@ void checkAccuracy(Body *p, Body *orig, int nBodies) {
   USE_TREE = false;
   USE_BH = false;
 
-  nbodyIterate(orig, 0.01f, nBodies, std::vector<DFTNode>(), 1);
+  nbodyIterate(orig, 0.01f, nBodies, 1, 0);
 
   float maxError = 0.0f;
   for (int i = 0; i < nBodies; i++) {
@@ -296,6 +309,10 @@ int main(const int argc, const char **argv) {
     }
   }
 
+  if (argc > 3) {
+    MAC_PARAM = atof(argv[3]);
+  }
+
   // TODO: other parameters we might want to control:
   // - SHIFT_DIGITS (controls how many keys/buckets are created)
   // - MAC_PARAM (controls the MAC parameter)
@@ -321,26 +338,10 @@ int main(const int argc, const char **argv) {
     pCopy[i] = p[i];
   }
 
-  std::vector<DFTNode> dft;
-  Octree *octree = new Octree(maxkeylength);
-
-  if (USE_TREE) {
-    int nUniqueLeaves = 0;
-    for (int i = 0; i < nBodies; i++) {
-      nUniqueLeaves += octree->insert(p[i]);
-    }
-
-    octree->buildDFT(dft, p);
-    printf("Octree built with %d buckets (leaves with unique key)\n",
-           nUniqueLeaves);
-    // octree->printTree(octree->root, 0);
-  }
-
-  nbodyIterate(p, dt, nBodies, dft, nIters);
+  nbodyIterate(p, dt, nBodies, nIters, maxkeylength);
   checkAccuracy(p, pCopy, nBodies);
 
   delete[] p;
   delete[] pCopy;
-  delete octree;
   return 0;
 }
