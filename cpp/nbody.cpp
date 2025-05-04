@@ -5,15 +5,17 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
+#include <iostream>
 #include <random>
-
-#include <cilk.h>
+// #include <cilk.h>
 
 #define SOFTENING 1e-9f
 #define POSMAX 100
 
-bool USE_TREE = true; // use tree or list
-bool USE_BH = true;   // use barnes hut or not
+bool USE_TREE = false; // use tree or list
+bool USE_BH = true;    // use barnes hut or not
+bool PRINT_TIME = true;
 float MAC_PARAM = .5; // MAC parameter
 
 bool MAC(float target_x, float target_y, float target_z, float x, float y,
@@ -35,6 +37,7 @@ int randomizeBodies(PhiloxEngine &rng, Body *bodies, int n) {
   int maxKeyLength = 0;
   std::uniform_real_distribution<float> x_dis(0, 1);
   std::uniform_real_distribution<float> v_dis(0, 1);
+
   for (int i = 0; i < n; i++) {
     Body &body = bodies[i];
     body.x = x_dis(rng);
@@ -136,56 +139,63 @@ int allInteractionsDFT(std::vector<DFTNode> dft, Body *bodies, int target,
   return nInteractions;
 }
 
-int allInteractionsDS(Body *bodies, int target, float dt, int nBodies) {
-  int nInteractions = 0;
+void allInteractionsDS(Body *bodies, float dt, int nBodies) {
+  int n = nBodies;
 
-  // iterate over all bodies (targets)
-  float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
-  for (int j = 0; j < nBodies; j++) {
-    nInteractions++;
-    float dx = bodies[j].x - bodies[target].x;
-    float dy = bodies[j].y - bodies[target].y;
-    float dz = bodies[j].z - bodies[target].z;
-    float distSqr = dx * dx + dy * dy + dz * dz + SOFTENING;
-    float invDist = 1.0f / sqrtf(distSqr);
-    float invDist3 = invDist * invDist * invDist;
+  for (int i = 0; i < n; ++i) {
 
-    Fx += dx * bodies[j].m * invDist3;
-    Fy += dy * bodies[j].m * invDist3;
-    Fz += dz * bodies[j].m * invDist3;
+    float Fx = 0.0;
+    float Fy = 0.0;
+    float Fz = 0.0;
+
+    // compute force, update velocities
+    for (int j = 0; j < n; ++j) {
+
+      float dx = bodies[j].x - bodies[i].x;
+      float dy = bodies[j].y - bodies[i].y;
+      float dz = bodies[j].z - bodies[i].z;
+      float distSqr = dx * dx + dy * dy + dz * dz + SOFTENING;
+      float invDist = 1.0f / sqrtf(distSqr);
+      float invDist3 = invDist * invDist * invDist;
+
+      Fx += dx * bodies[j].m * invDist3;
+      Fy += dy * bodies[j].m * invDist3;
+      Fz += dz * bodies[j].m * invDist3;
+    }
+
+    // update velocity
+    bodies[i].vx += dt * Fx;
+    bodies[i].vy += dt * Fy;
+    bodies[i].vz += dt * Fz;
   }
-  bodies[target].vx += dt * Fx;
-  bodies[target].vy += dt * Fy;
-  bodies[target].vz += dt * Fz;
-  return nInteractions;
 }
-void bodyForce(Body *p, float dt, int n, std::vector<DFTNode> dft) {
-  int mid = n / 2;
-  printf("DFT size: %ld\n", dft.size());
-  cilk_for(int i = 0; i < n; i++) {
-    if (USE_TREE && USE_BH)
-      MACInteractionsDFT(dft, p, i, dt, n);
-    else if (USE_TREE)
-      allInteractionsDFT(dft, p, i, dt, n);
-    else
-      allInteractionsDS(p, i, dt, n);
-  }
 
+void bodyForce(Body *p, float dt, int n, std::vector<DFTNode> dft) {
+
+  if (USE_TREE && USE_BH) {
+  } else if (USE_TREE) {
+  } else {
+    allInteractionsDS(p, dt, n);
+  }
+  // // printf("DFT size: %ld\n", dft.size());
+  // for (int i = 0; i < n; i++) {
+  //   if (USE_TREE && USE_BH)
+  //     MACInteractionsDFT(dft, p, i, dt, n);
+  //   else if (USE_TREE)
+  //     allInteractionsDFT(dft, p, i, dt, n);
+  //   else
+  //     allInteractionsDS(p, i, dt, n);
+  // }
+  //
   // printf("Total interactions: %ld\n", totalInteractions);
 }
 
-void integratePositionsRange(Body *p, float dt, int start, int end) {
+void integratePositions(Body *p, float dt, int start, int end) {
   for (int i = start; i < end; i++) {
-    p[i].x += p[i].vx * dt;
-    p[i].y += p[i].vy * dt;
-    p[i].z += p[i].vz * dt;
+    p[i].x += (p[i].vx * dt);
+    p[i].y += (p[i].vy * dt);
+    p[i].z += (p[i].vz * dt);
   }
-}
-
-void integratePositions(Body *p, float dt, int n) {
-  int mid = n / 2;
-  integratePositionsRange(p, dt, 0, mid);
-  integratePositionsRange(p, dt, mid, n);
 }
 
 void nbodyIterate(Body *p, float dt, int nBodies, int nIters,
@@ -195,9 +205,14 @@ void nbodyIterate(Body *p, float dt, int nBodies, int nIters,
   for (int iter = 1; iter <= nIters; iter++) {
 
     std::vector<DFTNode> dft;
-    Octree *octree = new Octree(maxkeylength);
 
+    Octree *octree;
+
+    ctimer_start(&timer);
+
+    // Reconstruct octree in every timestep
     if (USE_TREE) {
+      octree = new Octree(maxkeylength);
       int nUniqueLeaves = 0;
       for (int i = 0; i < nBodies; i++) {
         nUniqueLeaves += octree->insert(p[i]);
@@ -209,37 +224,32 @@ void nbodyIterate(Body *p, float dt, int nBodies, int nIters,
       // octree->printTree(octree->root, 0);
     }
 
-    ctimer_start(&timer);
-
-    // Compute interbody forces using cilk_scope with spawn.
     bodyForce(p, dt, nBodies, dft);
 
-    delete octree;
+    if (USE_TREE)
+      delete octree;
 
-    // Integrate positions concurrently by dividing the work.
-    integratePositions(p, dt, nBodies);
+    // Integrate positions
+    integratePositions(p, dt, 0, nBodies);
 
     ctimer_stop(&timer);
     ctimer_measure(&timer);
+
     double tElapsed = timespec_sec(timer.elapsed);
 
-    if (iter > 1) // skip the first iteration as warm-up
+    // skip the first iteration as warm-up
+    if (iter > 1)
       totalTime += tElapsed;
-
-#ifndef SHMOO
-    printf("Iteration %d: %.3f seconds\n", iter, tElapsed);
-#endif
   }
 
   double avgTime = totalTime / (double)(nIters - 1);
-#ifdef SHMOO
-  printf("%d, %0.3f\n", nBodies, 1e-9 * nBodies * nBodies / avgTime);
-#else
-  printf("Average time for iterations 2 through %d: %.3f seconds.\n", nIters,
-         avgTime);
-  printf("%d Bodies: average %0.3f Billion Interactions / second\n", nBodies,
-         1e-9 * nBodies * nBodies / avgTime);
-#endif
+
+  if (PRINT_TIME) {
+    printf("Total time = %.3f seconds, Average time = %.3f seconds.\n",
+           totalTime, avgTime);
+    printf("%d Bodies: average %0.3f Billion Interactions / second\n", nBodies,
+           1e-9 * nBodies * nBodies / avgTime);
+  }
 }
 
 void printBodiesToFile(Body *p, int nBodies) {
@@ -268,22 +278,23 @@ void checkAccuracy(Body *p, Body *orig, int nBodies) {
 
   USE_TREE = false;
   USE_BH = false;
-
-  nbodyIterate(orig, 0.01f, nBodies, 1, 0);
-
-  float maxError = 0.0f;
+  PRINT_TIME = false;
+  nbodyIterate(orig, 0.01f, nBodies, 10, 0);
+  PRINT_TIME = true;
+  // Compute RMS error(standard check for positional accuracy)
+  float rmsError = 0.0f;
   for (int i = 0; i < nBodies; i++) {
 
     float dx = p[i].x - orig[i].x;
     float dy = p[i].y - orig[i].y;
     float dz = p[i].z - orig[i].z;
-    float error = sqrtf(dx * dx + dy * dy + dz * dz);
-    if (error > maxError) {
-      maxError = error;
-    }
+    rmsError += dx * dx + dy * dy + dz * dz;
   }
-  printf("Max error: %f\n", maxError);
+  rmsError = std::sqrt((rmsError / nBodies));
+  printf("RMS error: %f\n", rmsError);
 }
+
+using namespace std;
 
 int main(const int argc, const char **argv) {
   printf("NBody Simulation\n");
@@ -297,6 +308,7 @@ int main(const int argc, const char **argv) {
     const char *method = argv[2];
     if (strcmp(method, "DS") == 0) {
       USE_TREE = false;
+      USE_BH = false;
     } else if (strcmp(method, "DFT") == 0) {
       USE_TREE = true;
       USE_BH = false;
@@ -323,25 +335,25 @@ int main(const int argc, const char **argv) {
   printf("-----------------------------------------------\n");
 
   const float dt = 0.01f; // time step
-  const int nIters = 1;   // simulation iterations
+  const int nIters = 10;  // simulation iterations
 
   // Allocate memory for nBodies
-  Body *p = new Body[nBodies];
+  Body *particles = new Body[nBodies];
 
   // Initialize positions, velocities, and masses (7 values per body)
   PhiloxEngine rng(2025);
-  int maxkeylength = randomizeBodies(rng, p, nBodies);
+  int maxkeylength = randomizeBodies(rng, particles, nBodies);
 
   // make a copy of bodies for accuracy check
-  Body *pCopy = new Body[nBodies];
+  Body *particles_cp = new Body[nBodies];
   for (int i = 0; i < nBodies; i++) {
-    pCopy[i] = p[i];
+    particles_cp[i] = particles[i];
   }
 
-  nbodyIterate(p, dt, nBodies, nIters, maxkeylength);
-  checkAccuracy(p, pCopy, nBodies);
+  nbodyIterate(particles, dt, nBodies, nIters, maxkeylength);
+  checkAccuracy(particles, particles_cp, nBodies);
 
-  delete[] p;
-  delete[] pCopy;
+  delete[] particles;
+  delete[] particles_cp;
   return 0;
 }

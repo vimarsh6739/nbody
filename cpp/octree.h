@@ -36,7 +36,7 @@ public:
   Node(Key key, bool isLeaf);
 };
 
-typedef struct DFTNode {
+typedef struct {
   int index;
   Key key;
   bool isLeaf;
@@ -47,7 +47,8 @@ typedef struct DFTNode {
   int nBodies;
 
   std::vector<int> bodies; // indeces into the bodies array
-};
+} DFTNode;
+
 class Octree {
 
 public:
