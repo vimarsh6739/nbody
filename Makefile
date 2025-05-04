@@ -4,7 +4,7 @@ CILK_FLAGS := -fopencilk
 
 CXX := g++
 NVCC := nvcc
-CXXFLAGS := -std=c++17 -Wall -Wextra -O2 -g -I.
+CXXFLAGS := -std=c++17 -Wall -Wextra -O0 -g -I.
 LDFLAGS= 
 
 # CPU implementation

@@ -222,8 +222,8 @@ void nbodyIterate(Body *p, float dt, int nBodies, int nIters,
       }
 
       octree->buildDFT(dft, p);
-      printf("Octree built with %d buckets (leaves with unique key)\n",
-             nUniqueLeaves);
+      // printf("Octree built with %d buckets (leaves with unique key)\n",
+      //        nUniqueLeaves);
       // octree->printTree(octree->root, 0);
     }
 

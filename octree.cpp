@@ -12,6 +12,11 @@ Node::Node(Key key, bool isLeaf) {
   this->key = key;
   this->isLeaf = isLeaf;
   this->subTreeSize = 1;
+  this->whichChildren = 0;
+
+  for(int i=0;i<8;++i)
+    this->children[i]=nullptr;
+  this->parent =nullptr;
 }
 
 Octree::Octree(int maxKeyLength) {
