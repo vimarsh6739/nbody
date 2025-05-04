@@ -13,5 +13,10 @@ compile_commands.json
 fib
 nbody
 qsort
-cuda/nbody_gpu
+cpu_nbody
+gpu_nbody
+
+#folders
+obj
+obj_gpu
 
