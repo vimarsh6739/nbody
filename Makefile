@@ -8,7 +8,7 @@ CXXFLAGS := -std=c++17 -Wall -Wextra -O0 -g -I.
 LDFLAGS= 
 
 # CPU implementation
-CPU_SRCS := nbody.cpp \
+CPU_SRCS := cpu-main.cpp \
 	    octree.cpp \
 	    philox_rng.cpp
 
@@ -16,7 +16,7 @@ CPU_OBJDIR := obj
 CPU_OBJS := $(patsubst %.cpp,$(CPU_OBJDIR)/%.o,$(CPU_SRCS))
 
 # GPU implementation
-GPU_SRCS := nbody_gpu.cu \
+GPU_SRCS := gpu-main.cu \
 	    octree.cpp \
 	    philox_rng.cpp
 
