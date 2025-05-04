@@ -4,11 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <iomanip>
 #include <iostream>
-#include <map>
-#include <random>
-#include <stdexcept>
 #include <string>
 #include <vector>
 
