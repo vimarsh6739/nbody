@@ -60,7 +60,7 @@ int randomizeBodies(PhiloxEngine &rng, Body *bodies, int n) {
     body.vz = (v_dis(rng)) * 2 - 1;
     body.m = (v_dis(rng)) + 0.1f;
   }
-
+  std::cout << "the maximum key length is = " << maxKeyLength << std::endl;
   // prepend all keys
   int prepend = 1 << maxKeyLength;
   for (int i = 0; i < n; i++) {

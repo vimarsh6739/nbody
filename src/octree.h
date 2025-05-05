@@ -1,10 +1,11 @@
 #ifndef OCTREE_H
 #define OCTREE_H
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
-typedef long long Key;
+typedef uint64_t Key;
 
 typedef struct {
   float x, y, z, vx, vy, vz, m; // each body now has a mass 'm'
@@ -14,7 +15,14 @@ typedef struct {
 
 Key getKeyNoPrepend(Body b);
 int binaryLength(Key n);
-std::string binaryString(Key key);
+
+template <typename T> std::string binaryString(T val) {
+  std::string s = "";
+  for (int i = sizeof(T) * 8 - 1; i >= 0; --i) {
+    s += std::to_string(((val >> i) & 1));
+  }
+  return s;
+}
 
 class Node {
 public:
