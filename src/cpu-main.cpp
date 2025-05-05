@@ -21,6 +21,8 @@ bool USE_BH = true;    // use barnes hut or not
 bool PRINT_TIME = true;
 float MAC_PARAM = .5; // MAC parameter
 
+int SHIFT_DIGITS = 16;
+
 bool MAC(float target_x, float target_y, float target_z, float x, float y,
          float z, float mass) {
 
@@ -49,7 +51,7 @@ int randomizeBodies(PhiloxEngine &rng, Body *bodies, int n) {
 
     body.index = i;
 
-    body.key = getKeyNoPrepend(body);
+    body.key = getKey(body, SHIFT_DIGITS);
     int keylength = binaryLength(body.key);
     if (keylength > maxKeyLength) {
       maxKeyLength = keylength;
@@ -61,13 +63,14 @@ int randomizeBodies(PhiloxEngine &rng, Body *bodies, int n) {
     body.m = (v_dis(rng)) + 0.1f;
   }
   std::cout << "the maximum key length is = " << maxKeyLength << std::endl;
+
   // prepend all keys
-  int prepend = 1 << maxKeyLength;
+  Key prepend = 1 << maxKeyLength;
   for (int i = 0; i < n; i++) {
     bodies[i].key += prepend;
   }
 
-  return maxKeyLength + 1;
+  return (maxKeyLength + 1);
 }
 
 int MACInteractionsDFT(std::vector<DFTNode> dft, Body *bodies, int target,
@@ -316,7 +319,9 @@ int main(const int argc, const char **argv) {
       cxxopts::value<float>()->default_value("1e-9"))(
       "q,quiet", "Suppress timing output",
       cxxopts::value<bool>()->default_value("false"))(
-      "h,help", "Print usage information");
+      "h,help",
+      "Print usage information")("w,shiftwidth", "Octree shift width",
+                                 cxxopts::value<int>()->default_value("16"));
 
   auto result = options.parse(argc, argv);
 
@@ -333,6 +338,7 @@ int main(const int argc, const char **argv) {
   float dt = result["timestep"].as<float>();
   SOFTENING = result["softening"].as<float>();
   PRINT_TIME = !result["quiet"].as<bool>();
+  SHIFT_DIGITS = result["shiftwidth"].as<int>();
 
   // Set simulation method
   if (method == "DS") {

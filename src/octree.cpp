@@ -119,16 +119,16 @@ void Octree::printTree(Node *node, int level) {
   }
 };
 
-Key getKeyNoPrepend(Body body) {
+Key getKey(Body body, int shift_digits) {
   Key key = 0;
 
   float x = body.x, y = body.y, z = body.z;
 
   // shift and trunacte
-  Key shift = 1 << SHIFT_DIGITS;
-  int xint = static_cast<int>(x * shift);
-  int yint = static_cast<int>(y * shift);
-  int zint = static_cast<int>(z * shift);
+  Key shift = 1 << shift_digits;
+  Key xint = static_cast<Key>(x * shift);
+  Key yint = static_cast<Key>(y * shift);
+  Key zint = static_cast<Key>(z * shift);
 
   // Check for overflow
   if (xint < 0 || yint < 0 || zint < 0) {
@@ -136,22 +136,24 @@ Key getKeyNoPrepend(Body body) {
     exit(EXIT_FAILURE);
   }
 
-  int pos = 0;
+  uint64_t pos = 0;
   while (xint || yint || zint) {
     // construct using LSB
     key |= (xint & 1) << pos;
-    key |= (yint & 1) << (pos + 1);
-    key |= (zint & 1) << (pos + 2);
+    key |= (yint & 1) << (pos + 1LL);
+    key |= (zint & 1) << (pos + 2LL);
 
-    xint = xint >> 1;
-    yint = yint >> 1;
-    zint = zint >> 1;
+    xint = xint >> 1LL;
+    yint = yint >> 1LL;
+    zint = zint >> 1LL;
 
     pos += 3;
   }
 
   // assert no key overflow
   assert(pos <= (sizeof(Key) * 8 - 1));
+  key += (1LL << (sizeof(Key) * 8 - 1)); // prepend 1
+  printf("key: %lu\n", key);
 
   return key;
 }
