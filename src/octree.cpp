@@ -1,10 +1,9 @@
 #include "octree.h"
+#include <assert.h>
 #include <cstdlib>
 #include <math.h>
 #include <stdio.h>
-
-#include <assert.h>
-#include <math.h>
+#include <string>
 
 #define SHIFT_DIGITS 20
 
@@ -111,7 +110,7 @@ void Octree::printTree(Node *node, int level) {
   for (int i = 0; i < level; i++)
     printf("  ");
 
-  printf("0b%s (%d)\n", binaryString(node->key).c_str(), node->key);
+  printf("0b%s (%lu)\n", binaryString<Key>(node->key).c_str(), node->key);
 
   if (!node->isLeaf) {
     for (int i = 0; i < 8; i++) {
@@ -120,20 +119,10 @@ void Octree::printTree(Node *node, int level) {
   }
 };
 
-std::string binaryString(Key k) {
-  std::string s = "";
-  if (k > 1)
-    s = binaryString(k / 2);
-
-  return s + std::to_string(k % 2);
-}
-
 Key getKeyNoPrepend(Body body) {
   Key key = 0;
 
-  float x = body.x;
-  float y = body.y;
-  float z = body.z;
+  float x = body.x, y = body.y, z = body.z;
 
   // shift and trunacte
   Key shift = 1 << SHIFT_DIGITS;
@@ -147,21 +136,22 @@ Key getKeyNoPrepend(Body body) {
     exit(EXIT_FAILURE);
   }
 
-  int i = 0;
+  int pos = 0;
   while (xint || yint || zint) {
-    key |= (xint & (1 << i)) << i;
-    key |= (yint & (1 << i)) << (i + 1);
-    key |= (zint & (1 << i)) << (i + 2);
+    // construct using LSB
+    key |= (xint & 1) << pos;
+    key |= (yint & 1) << (pos + 1);
+    key |= (zint & 1) << (pos + 2);
 
     xint = xint >> 1;
     yint = yint >> 1;
     zint = zint >> 1;
 
-    i += 3;
+    pos += 3;
   }
 
   // assert no key overflow
-  assert(i <= sizeof(Key) * 8 - 1);
+  assert(pos <= (sizeof(Key) * 8 - 1));
 
   return key;
 }
