@@ -39,7 +39,7 @@ bool MAC(float target_x, float target_y, float target_z, float x, float y,
 // Randomize the positions and velocities in the range [-1, 1],
 // and assign a mass (every 7th float) in the range [0.1, 1.0].
 int randomizeBodies(PhiloxEngine &rng, Body *bodies, int n) {
-  int maxKeyLength = 0;
+  int maxKeyLength = sizeof(Key) * 8;
   std::uniform_real_distribution<float> x_dis(0, 1);
   std::uniform_real_distribution<float> v_dis(0, 1);
 
@@ -52,10 +52,6 @@ int randomizeBodies(PhiloxEngine &rng, Body *bodies, int n) {
     body.index = i;
 
     body.key = getKey(body, SHIFT_DIGITS);
-    int keylength = binaryLength(body.key);
-    if (keylength > maxKeyLength) {
-      maxKeyLength = keylength;
-    }
 
     body.vx = (v_dis(rng)) * 2 - 1;
     body.vy = (v_dis(rng)) * 2 - 1;
@@ -64,13 +60,7 @@ int randomizeBodies(PhiloxEngine &rng, Body *bodies, int n) {
   }
   std::cout << "the maximum key length is = " << maxKeyLength << std::endl;
 
-  // prepend all keys
-  Key prepend = 1 << maxKeyLength;
-  for (int i = 0; i < n; i++) {
-    bodies[i].key += prepend;
-  }
-
-  return (maxKeyLength + 1);
+  return maxKeyLength;
 }
 
 int MACInteractionsDFT(std::vector<DFTNode> dft, Body *bodies, int target,
