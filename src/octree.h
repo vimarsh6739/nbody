@@ -13,13 +13,16 @@ typedef struct {
   int index; // index of the body in the bodies array
 } Body;
 
-Key getKeyNoPrepend(Body b);
+Key getKey(Body b, int shift_digits);
 int binaryLength(Key n);
 
 template <typename T> std::string binaryString(T val) {
   std::string s = "";
-  for (int i = sizeof(T) * 8 - 1; i >= 0; --i) {
-    s += std::to_string(((val >> i) & 1));
+  if (val == 0)
+    return "0";
+  while (val > 0) {
+    s = (val % 2 == 0 ? "0" : "1") + s;
+    val /= 2;
   }
   return s;
 }
@@ -65,7 +68,7 @@ public:
   int nLevels; // does not count root as a level
 
   Octree(int maxKeyLength);
-  void addChild(Node *parent, Node *child, int index, bool isLeaf, int key);
+  void addChild(Node *parent, Node *child, int index, bool isLeaf, Key key);
   int insert(Body body);
   void printTree(Node *node, int level);
   void buildDFT(std::vector<DFTNode> &nodes, Body *bodies);
