@@ -53,17 +53,17 @@ TEST(OctreeTest, BinaryLength) {
 
 // Test binaryString function
 TEST(OctreeTest, BinaryString) {
-    ASSERT_EQ(binaryString(0), "");
-    ASSERT_EQ(binaryString(1), "1");
-    ASSERT_EQ(binaryString(2), "10");
-    ASSERT_EQ(binaryString(3), "11");
-    ASSERT_EQ(binaryString(4), "100");
-    ASSERT_EQ(binaryString(5), "101");
-    ASSERT_EQ(binaryString(7), "111");
-    ASSERT_EQ(binaryString(8), "1000");
-    ASSERT_EQ(binaryString(10), "1010");
-    ASSERT_EQ(binaryString(15), "1111");
-    ASSERT_EQ(binaryString(16), "10000");
+    ASSERT_EQ(binaryString((short)0), "0000000000000000");
+    ASSERT_EQ(binaryString((short)1), "0000000000000001");
+    ASSERT_EQ(binaryString((short)2), "0000000000000010");
+    ASSERT_EQ(binaryString((short)3), "0000000000000011");
+    ASSERT_EQ(binaryString((short)4), "0000000000000100");
+    ASSERT_EQ(binaryString((short)5), "0000000000000101");
+    ASSERT_EQ(binaryString((short)7), "0000000000000111");
+    ASSERT_EQ(binaryString((short)8), "0000000000001000");
+    ASSERT_EQ(binaryString((short)10), "0000000000001010");
+    ASSERT_EQ(binaryString((short)15), "0000000000001111");
+    ASSERT_EQ(binaryString((short)16), "0000000000010000");
 }
 
 // Test Node constructor
