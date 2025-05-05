@@ -1,9 +1,8 @@
 #include "octree.h"
+#include <assert.h>
 #include <cstdlib>
 #include <math.h>
 #include <stdio.h>
-#include <assert.h>
-#include <math.h>
 #include <string>
 
 #define SHIFT_DIGITS 20
@@ -111,7 +110,6 @@ void Octree::printTree(Node *node, int level) {
   for (int i = 0; i < level; i++)
     printf("  ");
 
-  std::cout << "whatthefuck" << std::endl;
   printf("0b%s (%lu)\n", binaryString<Key>(node->key).c_str(), node->key);
 
   if (!node->isLeaf) {
