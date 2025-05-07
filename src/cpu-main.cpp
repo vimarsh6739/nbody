@@ -63,75 +63,79 @@ int randomizeBodies(PhiloxEngine &rng, Body *bodies, int n) {
   return maxKeyLength;
 }
 
-int MACInteractionsDFT(std::vector<DFTNode> dft, Body *bodies, int target,
-                       float dt, int nBodies) {
+int MACInteractionsDFT(std::vector<DFTNode> dft, Body *bodies, float dt,
+                       int nBodies) {
   // iterate over all bodies (targets)
   int nInteractions = 0;
-  float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
-  for (int j = 0; j < dft.size(); j++) {
-    if (dft[j].isLeaf) {
-      for (int bIndex : dft[j].bodies) {
+  for (int target = 0; target < nBodies; target++) {
+    float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
+    for (int j = 0; j < dft.size(); j++) {
+      if (dft[j].isLeaf) {
+        for (int bIndex : dft[j].bodies) {
+          nInteractions++;
+          float dx = bodies[bIndex].x - bodies[target].x;
+          float dy = bodies[bIndex].y - bodies[target].y;
+          float dz = bodies[bIndex].z - bodies[target].z;
+          float distSqr = dx * dx + dy * dy + dz * dz + SOFTENING;
+          float invDist = 1.0f / sqrtf(distSqr);
+          float invDist3 = invDist * invDist * invDist;
+
+          Fx += dx * bodies[bIndex].m * invDist3;
+          Fy += dy * bodies[bIndex].m * invDist3;
+          Fz += dz * bodies[bIndex].m * invDist3;
+        }
+      } else if (MAC(bodies[target].x, bodies[target].y, bodies[target].z,
+                     dft[j].x, dft[j].y, dft[j].z, dft[j].mass)) {
         nInteractions++;
-        float dx = bodies[bIndex].x - bodies[target].x;
-        float dy = bodies[bIndex].y - bodies[target].y;
-        float dz = bodies[bIndex].z - bodies[target].z;
+        float dx = dft[j].x - bodies[target].x;
+        float dy = dft[j].y - bodies[target].y;
+        float dz = dft[j].z - bodies[target].z;
         float distSqr = dx * dx + dy * dy + dz * dz + SOFTENING;
         float invDist = 1.0f / sqrtf(distSqr);
         float invDist3 = invDist * invDist * invDist;
 
-        Fx += dx * bodies[bIndex].m * invDist3;
-        Fy += dy * bodies[bIndex].m * invDist3;
-        Fz += dz * bodies[bIndex].m * invDist3;
+        Fx += dx * dft[j].mass * invDist3;
+        Fy += dy * dft[j].mass * invDist3;
+        Fz += dz * dft[j].mass * invDist3;
+        j = dft[j].autorope - 1; // -1 because we increment j in the for loop
       }
-    } else if (MAC(bodies[target].x, bodies[target].y, bodies[target].z,
-                   dft[j].x, dft[j].y, dft[j].z, dft[j].mass)) {
-      nInteractions++;
-      float dx = dft[j].x - bodies[target].x;
-      float dy = dft[j].y - bodies[target].y;
-      float dz = dft[j].z - bodies[target].z;
-      float distSqr = dx * dx + dy * dy + dz * dz + SOFTENING;
-      float invDist = 1.0f / sqrtf(distSqr);
-      float invDist3 = invDist * invDist * invDist;
-
-      Fx += dx * dft[j].mass * invDist3;
-      Fy += dy * dft[j].mass * invDist3;
-      Fz += dz * dft[j].mass * invDist3;
-      j = dft[j].autorope - 1; // -1 because we increment j in the for loop
     }
-  }
 
-  bodies[target].vx += dt * Fx;
-  bodies[target].vy += dt * Fy;
-  bodies[target].vz += dt * Fz;
+    bodies[target].vx += dt * Fx;
+    bodies[target].vy += dt * Fy;
+    bodies[target].vz += dt * Fz;
+  }
   return nInteractions;
 }
 
-int allInteractionsDFT(std::vector<DFTNode> dft, Body *bodies, int target,
-                       float dt, int nBodies) {
+int allInteractionsDFT(std::vector<DFTNode> dft, Body *bodies, float dt,
+                       int nBodies) {
   // iterate over all bodies (targets)
   int nInteractions = 0;
-  float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
+  for (int target = 0; target < nBodies; target++) {
+    float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
 
-  for (int j = 0; j < dft.size(); j++) {
-    if (dft[j].isLeaf) {
-      for (int bIndex : dft[j].bodies) {
-        nInteractions++;
-        float dx = bodies[bIndex].x - bodies[target].x;
-        float dy = bodies[bIndex].y - bodies[target].y;
-        float dz = bodies[bIndex].z - bodies[target].z;
-        float distSqr = dx * dx + dy * dy + dz * dz + SOFTENING;
-        float invDist = 1.0f / sqrtf(distSqr);
-        float invDist3 = invDist * invDist * invDist;
+    for (int j = 0; j < dft.size(); j++) {
+      if (dft[j].isLeaf) {
+        for (int bIndex : dft[j].bodies) {
+          nInteractions++;
+          float dx = bodies[bIndex].x - bodies[target].x;
+          float dy = bodies[bIndex].y - bodies[target].y;
+          float dz = bodies[bIndex].z - bodies[target].z;
+          float distSqr = dx * dx + dy * dy + dz * dz + SOFTENING;
+          float invDist = 1.0f / sqrtf(distSqr);
+          float invDist3 = invDist * invDist * invDist;
 
-        Fx += dx * bodies[bIndex].m * invDist3;
-        Fy += dy * bodies[bIndex].m * invDist3;
-        Fz += dz * bodies[bIndex].m * invDist3;
+          Fx += dx * bodies[bIndex].m * invDist3;
+          Fy += dy * bodies[bIndex].m * invDist3;
+          Fz += dz * bodies[bIndex].m * invDist3;
+        }
       }
     }
+    bodies[target].vx += dt * Fx;
+    bodies[target].vy += dt * Fy;
+    bodies[target].vz += dt * Fz;
   }
-  bodies[target].vx += dt * Fx;
-  bodies[target].vy += dt * Fy;
-  bodies[target].vz += dt * Fz;
   return nInteractions;
 }
 
@@ -168,22 +172,17 @@ void allInteractionsDS(Body *bodies, float dt, int nBodies) {
 
 void bodyForce(Body *p, float dt, int n, std::vector<DFTNode> dft) {
 
-  if (USE_TREE && USE_BH) {
-  } else if (USE_TREE) {
-  } else {
+  int nInteractions = 0;
+  if (USE_TREE && USE_BH)
+    nInteractions = MACInteractionsDFT(dft, p, dt, n);
+  else if (USE_TREE)
+    nInteractions = allInteractionsDFT(dft, p, dt, n);
+  else {
+    nInteractions = n * n;
     allInteractionsDS(p, dt, n);
   }
-  // // printf("DFT size: %ld\n", dft.size());
-  // for (int i = 0; i < n; i++) {
-  //   if (USE_TREE && USE_BH)
-  //     MACInteractionsDFT(dft, p, i, dt, n);
-  //   else if (USE_TREE)
-  //     allInteractionsDFT(dft, p, i, dt, n);
-  //   else
-  //     allInteractionsDS(p, i, dt, n);
-  // }
-  //
-  // printf("Total interactions: %ld\n", totalInteractions);
+
+  printf("Total interactions: %ld\n", nInteractions);
 }
 
 void integratePositions(Body *p, float dt, int start, int end) {
@@ -213,11 +212,14 @@ void nbodyIterate(Body *p, float dt, int nBodies, int nIters,
       for (int i = 0; i < nBodies; i++) {
         nUniqueLeaves += octree->insert(p[i]);
       }
-
       octree->buildDFT(dft, p);
       // printf("Octree built with %d buckets (leaves with unique key)\n",
       //        nUniqueLeaves);
       // octree->printTree(octree->root, 0);
+
+      printf("Octree created with %d nodes\n", octree->root->subTreeSize);
+      // octree->printTree(octree->root, 0);
+      assert(octree->root->nLeaves == nBodies);
     }
 
     bodyForce(p, dt, nBodies, dft);
@@ -268,14 +270,14 @@ void printBodiesToFile(Body *p, int nBodies) {
   }
 }
 
-void checkAccuracy(Body *p, Body *orig, int nBodies) {
+void checkAccuracy(Body *p, Body *orig, int nBodies, int nIters) {
   printf("-----------------------------------------------\n");
   printf("ACCURACY CHECK AGAINST DS\n");
 
   USE_TREE = false;
   USE_BH = false;
   PRINT_TIME = false;
-  nbodyIterate(orig, 0.01f, nBodies, 10, 0);
+  nbodyIterate(orig, 0.01f, nBodies, nIters, 0);
   PRINT_TIME = true;
   // Compute RMS error(standard check for positional accuracy)
   float rmsError = 0.0f;
@@ -322,6 +324,7 @@ int main(const int argc, const char **argv) {
 
   // parse options
   int nBodies = result["nbodies"].as<int>();
+
   std::string method = result["method"].as<std::string>();
   float mac_param = result["param"].as<float>();
   int nIters = result["iterations"].as<int>();
@@ -347,6 +350,7 @@ int main(const int argc, const char **argv) {
   }
 
   MAC_PARAM = mac_param;
+  printf("Beginning nbody simulation...\n");
   printf(" - %s method \n - %d bodies\n",
          USE_TREE ? (USE_BH ? "MAC" : "DFT") : "DS", nBodies);
   printf(" - MAC parameter: %f\n", MAC_PARAM);
@@ -373,7 +377,7 @@ int main(const int argc, const char **argv) {
   }
 
   nbodyIterate(particles, dt, nBodies, nIters, maxkeylength);
-  checkAccuracy(particles, particles_cp, nBodies);
+  checkAccuracy(particles, particles_cp, nBodies, nIters);
 
   delete[] particles;
   delete[] particles_cp;

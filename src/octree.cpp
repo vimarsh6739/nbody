@@ -24,8 +24,11 @@ Octree::Octree(int maxKeyLength) {
   nLevels = maxKeyLength / 3;
 }
 
-void Octree::addChild(Node *parent, Node *child, int index, bool isLeaf,
-                      Key mykey) {
+void Octree::addChild(Node *parent, int index, bool isLeaf, Key mykey) {
+  if (!isLeaf) {
+    mykey = (parent->key << 3LL) | index;
+  }
+
   assert(parent->isLeaf == false);
   assert(mykey > 0);
 
@@ -35,25 +38,35 @@ void Octree::addChild(Node *parent, Node *child, int index, bool isLeaf,
 }
 
 void Octree::splitNode(Node *current, int index, int nLevels, int level) {
-  Node *child = current->children[index];
+  // pushes the child of current one level deeper into the tree
+  Node *child = current->children[index]; // child needs to be split
 
-  // compute and check the level of the child
-  int newlevel = binaryLength(child->key) / 3;
+  int currentlevel = binaryLength(current->key) / 3;
+  int newlevel = currentlevel + 1;
+  int childlevel = binaryLength(child->key) / 3;
+
   assert(newlevel < nLevels);
+  assert(newlevel > currentlevel);
+  assert(childlevel > newlevel);
 
-  int shift = (3 * (nLevels - newlevel - 1));
-  Key shifted = child->key >> shift;
-  int childIndex = (int)shifted & 0x7;
+  // compute the key for the new node
+  Key newkey = child->key >> (3 * (nLevels - newlevel));
 
-  current->children[index] = new Node(shifted, false);
-  current->children[index]->parent = current;
+  // compute index for child as a child of the new node
+  int childIndex = (child->key >> (3 * (nLevels - (newlevel + 1)))) & 0x7;
 
-  child->parent = current->children[index];
-  current->children[index]->children[childIndex] = child;
-  current->children[index]->whichChildren |= 1 << childIndex;
+  Node *newParent = new Node(newkey, false);
+
+  current->children[index] = newParent;
+  newParent->parent = current;
+
+  child->parent = newParent;
+  newParent->children[childIndex] = child;
+  newParent->whichChildren |= 1 << childIndex;
 }
 
 int Octree::insert(Body body) {
+
   Node *current = root;
   Key key = body.key;
 
@@ -64,7 +77,8 @@ int Octree::insert(Body body) {
 
   // insert internal nodes
   int level = 0;
-  while (level < nLevels - 1) {
+  while (level < nLevels) {
+
     Key shifted = key >> (3 * (nLevels - level - 1));
     int index = (int)shifted & 0x7;
 
@@ -74,7 +88,7 @@ int Octree::insert(Body body) {
 
     if (current->children[index] == NULL) {
       // new child at this leaf must be created
-      addChild(current, current->children[index], index, false, shifted);
+      addChild(current, index, false, key);
 
       // if other leaves exist at this level, split them.
       // not sure if this isnecessary
@@ -94,24 +108,29 @@ int Octree::insert(Body body) {
         splitNode(current, index, nLevels, level);
       }
     }
+
     current = current->children[index];
     level = binaryLength(current->key) / 3;
   }
 
   // insert leaf
   int index = (key >> (3 * (nLevels - level - 1))) & 0x7;
+  int newLeafCreated = 0;
 
   // otherwise have to handle duplicate keys
   if (current->children[index] == NULL) {
-    addChild(current, current->children[index], index, true, key);
+    addChild(current, index, true, key);
+    assert(current->children[index]->key == key);
     current->children[index]->bodies.push_back(arrIndex);
-    return 1;
+    newLeafCreated = 1;
   } else {
+    assert(current->children[index]->key == key);
     current->children[index]->bodies.push_back(arrIndex);
     if (current->children[index]->bodies.size() > 1) {
     }
-    return 0;
   }
+
+  return newLeafCreated;
 };
 
 void Octree::printTree(Node *node, int level) {
@@ -121,7 +140,12 @@ void Octree::printTree(Node *node, int level) {
   for (int i = 0; i < level; i++)
     printf("  ");
 
-  printf("0b%s (%lu)\n", binaryString<Key>(node->key).c_str(), node->key);
+  if (node->isLeaf) {
+    printf("0b%s (%lu) (%lu)\n", binaryString<Key>(node->key).c_str(),
+           node->key, node->nBodies);
+  } else {
+    printf("0b%s (%lu)\n", binaryString<Key>(node->key).c_str(), node->key);
+  }
 
   if (!node->isLeaf) {
     for (int i = 0; i < 8; i++) {
@@ -164,6 +188,7 @@ Key getKey(Body body, int shift_digits) {
   // assert no key overflow
   assert(pos <= (sizeof(Key) * 8 - 1));
   key += (1LL << (sizeof(Key) * 8 - 1)); // prepend 1
+
   return key;
 }
 
@@ -185,6 +210,7 @@ void Octree::setSubtreeSizes(Node *node, Body *bodies) {
 
   if (node->isLeaf) {
     node->subTreeSize = 1;
+    node->nLeaves = node->bodies.size();
 
     // compute center of mass and relevant aggregate information
     if (node->bodies.size() == 0) {
@@ -209,6 +235,7 @@ void Octree::setSubtreeSizes(Node *node, Body *bodies) {
     if (node->whichChildren & (1 << i)) {
       setSubtreeSizes(node->children[i], bodies);
       node->subTreeSize += node->children[i]->subTreeSize;
+      node->nLeaves += node->children[i]->nLeaves;
 
       x += node->children[i]->x * node->children[i]->nBodies;
       y += node->children[i]->y * node->children[i]->nBodies;

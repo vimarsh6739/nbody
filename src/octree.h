@@ -39,6 +39,7 @@ public:
   std::vector<int> bodies; // indeces into the bodies array
 
   int subTreeSize; // used to build autoropes
+  int nLeaves;     // number of leaves in the subtree
 
   float x, y, z; // center of mass of the node
   float mass;    // total mass of the node
@@ -68,7 +69,7 @@ public:
   int nLevels; // does not count root as a level
 
   Octree(int maxKeyLength);
-  void addChild(Node *parent, Node *child, int index, bool isLeaf, Key key);
+  void addChild(Node *parent, int index, bool isLeaf, Key key);
   int insert(Body body);
   void printTree(Node *node, int level);
   void buildDFT(std::vector<DFTNode> &nodes, Body *bodies);
