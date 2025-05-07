@@ -77,12 +77,8 @@ void createOctree(std::vector<DFTNode> &dft, Octree *octree, Body *bodies,
   assert(octree->root->nLeaves == nBodies);
 }
 
-int MACInteractionsDFT(Body *bodies, float dt, int nBodies) {
-
-  Octree *octree = new Octree(MAX_KEY_LENGTH);
-  std::vector<DFTNode> dft;
-
-  createOctree(dft, octree, bodies, nBodies);
+int MACInteractionsDFT(Body *bodies, float dt, int nBodies,
+                       std::vector<DFTNode> &dft) {
 
   // iterate over all bodies (targets)
   int nInteractions = 0;
@@ -125,15 +121,11 @@ int MACInteractionsDFT(Body *bodies, float dt, int nBodies) {
     bodies[target].vz += dt * Fz;
   }
 
-  delete octree;
   return nInteractions;
 }
 
-int allInteractionsDFT(Body *bodies, float dt, int nBodies) {
-  Octree *octree = new Octree(MAX_KEY_LENGTH);
-  std::vector<DFTNode> dft;
-
-  createOctree(dft, octree, bodies, nBodies);
+int allInteractionsDFT(Body *bodies, float dt, int nBodies,
+                       std::vector<DFTNode> &dft) {
 
   // iterate over all bodies (targets)
   int nInteractions = 0;
@@ -162,9 +154,6 @@ int allInteractionsDFT(Body *bodies, float dt, int nBodies) {
     bodies[target].vz += dt * Fz;
   }
   return nInteractions;
-
-  delete octree;
-  dft.clear();
 }
 
 void allInteractionsDS(Body *bodies, float dt, int nBodies) {
@@ -198,19 +187,16 @@ void allInteractionsDS(Body *bodies, float dt, int nBodies) {
   }
 }
 
-void bodyForce(Body *p, float dt, int n) {
+int bodyForce(Body *p, float dt, int n, std::vector<DFTNode> dft) {
 
-  int nInteractions = 0;
   if (USE_TREE && USE_BH)
-    nInteractions = MACInteractionsDFT(p, dt, n);
+    return MACInteractionsDFT(p, dt, n, dft);
   else if (USE_TREE)
-    nInteractions = allInteractionsDFT(p, dt, n);
+    return allInteractionsDFT(p, dt, n, dft);
   else {
-    nInteractions = n * n;
     allInteractionsDS(p, dt, n);
+    return n * n;
   }
-
-  printf("Total interactions: %ld\n", nInteractions);
 }
 
 void integratePositions(Body *p, float dt, int start, int end) {
@@ -226,7 +212,14 @@ void nbodyIterate(Body *p, float dt, int nBodies, int nIters) {
   ctimer_t timer;
   for (int iter = 1; iter <= nIters; iter++) {
     ctimer_start(&timer);
-    bodyForce(p, dt, nBodies);
+
+    std::vector<DFTNode> dft;
+    if (USE_TREE) {
+      Octree *octree = new Octree(MAX_KEY_LENGTH);
+      createOctree(dft, octree, p, nBodies);
+    }
+
+    int nInteractions = bodyForce(p, dt, nBodies, dft);
 
     // Integrate positions
     integratePositions(p, dt, 0, nBodies);
@@ -239,6 +232,8 @@ void nbodyIterate(Body *p, float dt, int nBodies, int nIters) {
     // skip the first iteration as warm-up
     if (iter > 1)
       totalTime += tElapsed;
+
+    printf("Iteration %d: time = %.3f seconds\n", iter, tElapsed);
   }
 
   double avgTime = totalTime / (double)(nIters - 1);
