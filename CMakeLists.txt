@@ -16,7 +16,7 @@ endif()
 # Set compiler flags for different build types
 set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O2")
-set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+set(CMAKE_CXX_FLAGS "-Wall -Wextra -fno-omit-frame-pointer")
 
 # system threads
 find_package(Threads REQUIRED)
@@ -60,11 +60,10 @@ FetchContent_Declare(
 )
 
 # Include directories
-include_directories(${CMAKE_SOURCE_DIR}/src)
 include_directories(${CMAKE_SOURCE_DIR}/common)
 
 # Add subdirectories
-add_subdirectory(src)
+add_subdirectory(cpp)
 if(CUDAToolkit_FOUND AND DEFINED ENV{ENABLE_CUDA})
   add_subdirectory(cuda)
 endif()
