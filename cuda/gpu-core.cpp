@@ -142,19 +142,19 @@ void allInteractionsDS(Body *bodies, float dt, int nBodies) {
   int n = nBodies;
 
   for (int i = 0; i < n; ++i) {
-    float Fx = 0.0;
-    float Fy = 0.0;
-    float Fz = 0.0;
+    double Fx = 0.0;
+    double Fy = 0.0;
+    double Fz = 0.0;
 
     // compute force, update velocities
     for (int j = 0; j < n; ++j) {
 
-      float dx = bodies[j].x - bodies[i].x;
-      float dy = bodies[j].y - bodies[i].y;
-      float dz = bodies[j].z - bodies[i].z;
-      float distSqr = dx * dx + dy * dy + dz * dz + SOFTENING;
-      float invDist = 1.0f / sqrtf(distSqr);
-      float invDist3 = invDist * invDist * invDist;
+      double dx = bodies[j].x - bodies[i].x;
+      double dy = bodies[j].y - bodies[i].y;
+      double dz = bodies[j].z - bodies[i].z;
+      double distSqr = dx * dx + dy * dy + dz * dz + SOFTENING;
+      double invDist = 1.0f / sqrtf(distSqr);
+      double invDist3 = invDist * invDist * invDist;
 
       Fx += dx * bodies[j].m * invDist3;
       Fy += dy * bodies[j].m * invDist3;
@@ -162,9 +162,9 @@ void allInteractionsDS(Body *bodies, float dt, int nBodies) {
     }
 
     // update velocity
-    bodies[i].vx += dt * Fx;
-    bodies[i].vy += dt * Fy;
-    bodies[i].vz += dt * Fz;
+    bodies[i].vx += (double) dt * Fx;
+    bodies[i].vy += (double) dt * Fy;
+    bodies[i].vz += (double) dt * Fz;
   }
 }
 
@@ -178,15 +178,16 @@ float checkAccuracy(Body *p, Body *orig, int nBodies, int nIters) {
   CUDA = false;
   nbodyIterate(orig, 0.01f, nBodies, nIters);
   PRINT_TIME = true;
-  // Compute RMS error(standard check for positional accuracy)
-  float rmsError = 0.0f;
-  for (int i = 0; i < nBodies; i++) {
 
-    float dx = p[i].x - orig[i].x;
-    float dy = p[i].y - orig[i].y;
-    float dz = p[i].z - orig[i].z;
+  // Compute RMS error(standard check for positional accuracy)
+  double rmsError = 0.0f;
+  for (int i = 0; i < nBodies; i++) {
+    double dx = p[i].x - orig[i].x;
+    double dy = p[i].y - orig[i].y;
+    double dz = p[i].z - orig[i].z;
     rmsError += dx * dx + dy * dy + dz * dz;
   }
+
   rmsError = std::sqrt((rmsError / nBodies));
 
   return rmsError;
@@ -241,7 +242,6 @@ int bodyForce(Body *p, float dt, int n, std::vector<DFTNode> dft) {
     launchDS(p, dt, n);
   else
     allInteractionsDS(p, dt, n);
-  }
 
   return 0;
 }

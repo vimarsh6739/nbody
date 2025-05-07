@@ -8,7 +8,7 @@
 typedef uint64_t Key;
 
 typedef struct {
-  float x, y, z, vx, vy, vz, m; // each body now has a mass 'm'
+  double x, y, z, vx, vy, vz, m; // each body now has a mass 'm'
   Key key;
   int index; // index of the body in the bodies array
 } Body;
