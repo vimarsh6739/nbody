@@ -6,13 +6,16 @@
 // Define all CLI options
 
 extern int launchDS(Body *bodies, float dt, int nBodies);
+extern int launchDFT(Body *bodies, float dt, int nBodies,
+                     std::vector<DFTNode> &dft);
+extern int launchMAC(Body *bodies, float dt, int nBodies,
+                     std::vector<DFTNode> &dft, float mac_param);
 
 int bodyForce(Body *p, float dt, int n, std::vector<DFTNode> dft) {
-
   if (USE_TREE && USE_BH)
-    MACInteractionsDFT(p, dt, n, dft);
+    launchMAC(p, dt, n, dft, MAC_PARAM);
   else if (USE_TREE)
-    allInteractionsDFT(p, dt, n, dft);
+    launchDFT(p, dt, n, dft);
   else if (CUDA)
     launchDS(p, dt, n);
   else

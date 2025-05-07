@@ -8,7 +8,6 @@
 #include <random>
 
 int bodyForce(Body *p, float dt, int n, std::vector<DFTNode> dft) {
-
   if (USE_TREE && USE_BH)
     return MACInteractionsDFT(p, dt, n, dft);
   else if (USE_TREE)
