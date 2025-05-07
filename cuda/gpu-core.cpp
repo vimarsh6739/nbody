@@ -57,18 +57,17 @@ void createOctree(std::vector<DFTNode> &dft, Octree *octree, Body *bodies,
   assert(octree->root->nLeaves == nBodies);
 }
 
-int MACInteractionsDFT(Body *bodies, float dt, int nBodies,
-                       std::vector<DFTNode> &dft) {
+void MACInteractionsDFT(Body *bodies, float dt, int nBodies,
+                        std::vector<DFTNode> &dft) {
 
   // iterate over all bodies (targets)
-  int nInteractions = 0;
 
   for (int target = 0; target < nBodies; target++) {
     float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
     for (int j = 0; j < dft.size(); j++) {
       if (dft[j].isLeaf) {
         for (int bIndex : dft[j].bodies) {
-          nInteractions++;
+
           float dx = bodies[bIndex].x - bodies[target].x;
           float dy = bodies[bIndex].y - bodies[target].y;
           float dz = bodies[bIndex].z - bodies[target].z;
@@ -82,7 +81,7 @@ int MACInteractionsDFT(Body *bodies, float dt, int nBodies,
         }
       } else if (MAC(bodies[target].x, bodies[target].y, bodies[target].z,
                      dft[j].x, dft[j].y, dft[j].z, dft[j].mass)) {
-        nInteractions++;
+
         float dx = dft[j].x - bodies[target].x;
         float dy = dft[j].y - bodies[target].y;
         float dz = dft[j].z - bodies[target].z;
@@ -101,15 +100,10 @@ int MACInteractionsDFT(Body *bodies, float dt, int nBodies,
     bodies[target].vy += dt * Fy;
     bodies[target].vz += dt * Fz;
   }
-
-  return nInteractions;
 }
 
-int allInteractionsDFT(Body *bodies, float dt, int nBodies,
-                       std::vector<DFTNode> &dft) {
-
-  // iterate over all bodies (targets)
-  int nInteractions = 0;
+void allInteractionsDFT(Body *bodies, float dt, int nBodies,
+                        std::vector<DFTNode> &dft) {
 
   for (int target = 0; target < nBodies; target++) {
     float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
@@ -117,7 +111,6 @@ int allInteractionsDFT(Body *bodies, float dt, int nBodies,
     for (int j = 0; j < dft.size(); j++) {
       if (dft[j].isLeaf) {
         for (int bIndex : dft[j].bodies) {
-          nInteractions++;
           float dx = bodies[bIndex].x - bodies[target].x;
           float dy = bodies[bIndex].y - bodies[target].y;
           float dz = bodies[bIndex].z - bodies[target].z;
@@ -135,7 +128,6 @@ int allInteractionsDFT(Body *bodies, float dt, int nBodies,
     bodies[target].vy += dt * Fy;
     bodies[target].vz += dt * Fz;
   }
-  return nInteractions;
 }
 
 void allInteractionsDS(Body *bodies, float dt, int nBodies) {
