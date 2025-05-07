@@ -1,5 +1,5 @@
-#include "cpu-core.h"
 #include "ctimer.h"
+#include "main.h"
 #include <assert.h>
 
 #ifdef ENABLE_CILK

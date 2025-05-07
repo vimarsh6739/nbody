@@ -1,6 +1,6 @@
 # CPU implementation sources
 set(CPU_SOURCES
-    cpu-main.cpp
+    ../common/main.cpp
     ../common/octree.cpp
     ../common/philox_rng.cpp
     cpu-core.cpp
@@ -44,6 +44,6 @@ add_library(cpu_nbody_core STATIC
     ../common/octree.cpp
     ../common/philox_rng.cpp
     cpu-core.cpp
-    cpu-main.cpp
+    ../common/main.cpp
 )
 

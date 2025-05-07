@@ -1,6 +1,6 @@
 # CPU implementation sources
 set(GPU_SOURCES
-    gpu-main.cpp
+    ../common/main.cpp
     gpu-core.cpp
     ../common/octree.cpp
     ../common/philox_rng.cpp
@@ -28,6 +28,6 @@ add_library(gpu_nbody_core STATIC
     ../common/octree.cpp
     ../common/philox_rng.cpp
     gpu-core.cpp
-    gpu-main.cpp
+    ../common/main.cpp
     kernels.cu
 )

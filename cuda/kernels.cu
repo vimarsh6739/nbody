@@ -2,7 +2,7 @@
 
 // filename: example.cu
 
-#include "gpu-core.h"
+#include "main.h"
 #include "octree.h"
 #include <cuda_runtime.h>
 #include <iostream>

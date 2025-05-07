@@ -9,7 +9,7 @@
 
 #include <string>
 
-#include "gpu-core.h"
+#include "main.h"
 
 float SOFTENING = 1e-9f;
 
@@ -40,9 +40,9 @@ int main(const int argc, const char **argv) {
       cxxopts::value<float>()->default_value("1e-9"))(
       "q,quiet", "Suppress timing output",
       cxxopts::value<bool>()->default_value("false"))(
-      "h,help",
-      "Print usage information")("w,shiftwidth", "Octree shift width",
-                                 cxxopts::value<int>()->default_value("16"));
+      "h,help", "Print usage information")(
+      "w,shiftwidth", "Octree shift width",
+      cxxopts::value<int>()->default_value("16"))("e,error", "Enable flag");
 
   auto result = options.parse(argc, argv);
 
@@ -50,6 +50,12 @@ int main(const int argc, const char **argv) {
     std::cout << options.help() << std::endl;
     return 0;
   }
+
+  bool errorCheck = false;
+  if (result.count("error")) {
+    errorCheck = true;
+  }
+  printf("Error check: %s\n", errorCheck ? "true" : "false");
 
   // parse options
   int nBodies = result["nbodies"].as<int>();
@@ -106,8 +112,10 @@ int main(const int argc, const char **argv) {
   }
 
   nbodyIterate(particles, dt, nBodies, nIters);
-  float err = checkAccuracy(particles, particles_cp, nBodies, nIters);
-  printf("RMS error: %f\n", err);
+  if (errorCheck) {
+    float err = checkAccuracy(particles, particles_cp, nBodies, nIters);
+    printf("RMS error: %f\n", err);
+  }
 
   delete[] particles;
   delete[] particles_cp;
