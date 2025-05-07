@@ -180,7 +180,7 @@ float checkAccuracy(Body *p, Body *orig, int nBodies, int nIters) {
   PRINT_TIME = true;
 
   // Compute RMS error(standard check for positional accuracy)
-  double rmsError = 0.0f;
+  double rmsError = 0.0;
   for (int i = 0; i < nBodies; i++) {
     double dx = p[i].x - orig[i].x;
     double dy = p[i].y - orig[i].y;

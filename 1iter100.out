@@ -1,0 +1,14 @@
+Beginning nbody simulation...
+ - DS method 
+ - 10000 bodies
+ - MAC parameter: 0.500000
+ - Iterations: 1
+ - Time step: 0.010000
+-----------------------------------------------
+Iteration 1: time = 0.456 seconds
+Total time = 0.000 seconds, Average time = -nan seconds.
+10000 Bodies: average -nan Billion Interactions / second
+-----------------------------------------------
+ACCURACY CHECK AGAINST DS
+Iteration 1: time = 1.832 seconds
+RMS error: 0.000000

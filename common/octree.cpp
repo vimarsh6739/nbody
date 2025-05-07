@@ -208,8 +208,11 @@ void Octree::setSubtreeSizes(Node *node, Body *bodies) {
   float x = 0.0f, y = 0.0f, z = 0.0f;
   float mass = 0.0f;
 
+  node->nLeaves = 0;
+
   if (node->isLeaf) {
     node->subTreeSize = 1;
+
     node->nLeaves = node->bodies.size();
 
     // compute center of mass and relevant aggregate information

@@ -1,0 +1,96 @@
+Beginning nbody simulation...
+ - DS method 
+ - 100 bodies
+ - MAC parameter: 0.500000
+ - Iterations: 10
+ - Time step: 0.010000
+-----------------------------------------------
+Iteration 1: time = 0.409 seconds
+Iteration 2: time = 0.000 seconds
+Iteration 3: time = 0.000 seconds
+Iteration 4: time = 0.000 seconds
+Iteration 5: time = 0.000 seconds
+Iteration 6: time = 0.000 seconds
+Iteration 7: time = 0.000 seconds
+Iteration 8: time = 0.000 seconds
+Iteration 9: time = 0.000 seconds
+Iteration 10: time = 0.000 seconds
+Total time = 0.003 seconds, Average time = 0.000 seconds.
+100 Bodies: average 0.035 Billion Interactions / second
+-----------------------------------------------
+ACCURACY CHECK AGAINST DS
+Iteration 1: time = 0.000 seconds
+Iteration 2: time = 0.000 seconds
+Iteration 3: time = 0.000 seconds
+Iteration 4: time = 0.000 seconds
+Iteration 5: time = 0.000 seconds
+Iteration 6: time = 0.000 seconds
+Iteration 7: time = 0.000 seconds
+Iteration 8: time = 0.000 seconds
+Iteration 9: time = 0.000 seconds
+Iteration 10: time = 0.000 seconds
+RMS error: 0.000293
+Beginning nbody simulation...
+ - DS method 
+ - 1000 bodies
+ - MAC parameter: 0.500000
+ - Iterations: 10
+ - Time step: 0.010000
+-----------------------------------------------
+Iteration 1: time = 0.300 seconds
+Iteration 2: time = 0.001 seconds
+Iteration 3: time = 0.001 seconds
+Iteration 4: time = 0.001 seconds
+Iteration 5: time = 0.001 seconds
+Iteration 6: time = 0.001 seconds
+Iteration 7: time = 0.001 seconds
+Iteration 8: time = 0.001 seconds
+Iteration 9: time = 0.001 seconds
+Iteration 10: time = 0.001 seconds
+Total time = 0.005 seconds, Average time = 0.001 seconds.
+1000 Bodies: average 1.744 Billion Interactions / second
+-----------------------------------------------
+ACCURACY CHECK AGAINST DS
+Iteration 1: time = 0.016 seconds
+Iteration 2: time = 0.016 seconds
+Iteration 3: time = 0.016 seconds
+Iteration 4: time = 0.016 seconds
+Iteration 5: time = 0.016 seconds
+Iteration 6: time = 0.016 seconds
+Iteration 7: time = 0.016 seconds
+Iteration 8: time = 0.016 seconds
+Iteration 9: time = 0.016 seconds
+Iteration 10: time = 0.016 seconds
+RMS error: 0.002874
+Beginning nbody simulation...
+ - DS method 
+ - 10000 bodies
+ - MAC parameter: 0.500000
+ - Iterations: 10
+ - Time step: 0.010000
+-----------------------------------------------
+Iteration 1: time = 0.313 seconds
+Iteration 2: time = 0.004 seconds
+Iteration 3: time = 0.004 seconds
+Iteration 4: time = 0.004 seconds
+Iteration 5: time = 0.004 seconds
+Iteration 6: time = 0.004 seconds
+Iteration 7: time = 0.004 seconds
+Iteration 8: time = 0.004 seconds
+Iteration 9: time = 0.004 seconds
+Iteration 10: time = 0.004 seconds
+Total time = 0.036 seconds, Average time = 0.004 seconds.
+10000 Bodies: average 25.263 Billion Interactions / second
+-----------------------------------------------
+ACCURACY CHECK AGAINST DS
+Iteration 1: time = 1.610 seconds
+Iteration 2: time = 1.612 seconds
+Iteration 3: time = 1.612 seconds
+Iteration 4: time = 1.613 seconds
+Iteration 5: time = 1.611 seconds
+Iteration 6: time = 1.609 seconds
+Iteration 7: time = 1.607 seconds
+Iteration 8: time = 1.611 seconds
+Iteration 9: time = 1.613 seconds
+Iteration 10: time = 1.614 seconds
+RMS error: 0.160310
