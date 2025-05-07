@@ -71,8 +71,6 @@ void createOctree(std::vector<DFTNode> &dft, Octree *octree, Body *bodies,
   // printf("Octree built with %d buckets (leaves with unique key)\n",
   //        nUniqueLeaves);
   // octree->printTree(octree->root, 0);
-
-  printf("Octree created with %d nodes\n", octree->root->subTreeSize);
   // octree->printTree(octree->root, 0);
   assert(octree->root->nLeaves == nBodies);
 }
@@ -210,11 +208,11 @@ void integratePositions(Body *p, float dt, int start, int end) {
 void nbodyIterate(Body *p, float dt, int nBodies, int nIters) {
   double totalTime = 0.0;
   ctimer_t timer;
+  std::vector<DFTNode> dft;
   for (int iter = 1; iter <= nIters; iter++) {
     ctimer_start(&timer);
 
-    std::vector<DFTNode> dft;
-    if (USE_TREE) {
+    if (USE_TREE && iter == 1) {
       Octree *octree = new Octree(MAX_KEY_LENGTH);
       createOctree(dft, octree, p, nBodies);
     }
