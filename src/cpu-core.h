@@ -1,9 +1,8 @@
 #include "octree.h"
 #include "philox_engine.h"
 
-extern float SOFTENING;
 #define POSMAX 100
-
+extern float SOFTENING;
 extern bool USE_TREE;
 extern bool USE_BH;
 extern bool PRINT_TIME;

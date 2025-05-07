@@ -44,6 +44,7 @@ add_library(nbody_core STATIC
     octree.cpp
     philox_rng.cpp
     cpu-core.cpp
+    cpu-main.cpp
 )
 
 

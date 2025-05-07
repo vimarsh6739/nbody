@@ -127,28 +127,28 @@ TEST(OctreeTest, OctreeInsert) {
 
 // Test DFT error
 TEST(OctreeTest, DFTError) {
-  // Octree octree(sizeof(Key) * 8);
+  Octree octree(sizeof(Key) * 8);
 
-  // // Create a test body with a properly formatted key
-  // // The key must have a 1 in the most significant bit (prepended)
-  // // which means bit position leafLength - 1 (20 in this case)
-  // int nBodies = 100;
-  // Body *particles = new Body[nBodies];
+  // Create a test body with a properly formatted key
+  // The key must have a 1 in the most significant bit (prepended)
+  // which means bit position leafLength - 1 (20 in this case)
+  int nBodies = 100;
+  Body *particles = new Body[nBodies];
 
-  // // Initialize positions, velocities, and masses (7 values per body)
-  // PhiloxEngine rng(2025);
-  // randomizeBodies(rng, particles, nBodies);
+  // Initialize positions, velocities, and masses (7 values per body)
+  PhiloxEngine rng(2025);
+  randomizeBodies(rng, particles, nBodies);
 
-  // // make a copy of bodies for accuracy check
-  // Body *particles_cp = new Body[nBodies];
-  // for (int i = 0; i < nBodies; i++) {
-  //   particles_cp[i] = particles[i];
-  // }
+  // make a copy of bodies for accuracy check
+  Body *particles_cp = new Body[nBodies];
+  for (int i = 0; i < nBodies; i++) {
+    particles_cp[i] = particles[i];
+  }
 
-  // int nIters = 1;
-  // float dt = 10;
-  // nbodyIterate(particles, dt, nBodies, nIters);
-  // float err = checkAccuracy(particles, particles_cp, nBodies, nIters);
+  int nIters = 1;
+  float dt = 10;
+  nbodyIterate(particles, dt, nBodies, nIters);
+  float err = checkAccuracy(particles, particles_cp, nBodies, nIters);
 
-  // ASSERT_LE(err, 1e-9); // Should return 0 for duplicate
+  ASSERT_LE(err, 1e-9); // Should return 0 for duplicate
 }
