@@ -22,6 +22,7 @@ bool PRINT_TIME = true;
 float MAC_PARAM = .5; // MAC parameter
 
 int SHIFT_DIGITS = 16;
+int MAX_KEY_LENGTH = sizeof(Key) * 8;
 
 bool MAC(float target_x, float target_y, float target_z, float x, float y,
          float z, float mass) {
@@ -38,8 +39,7 @@ bool MAC(float target_x, float target_y, float target_z, float x, float y,
 
 // Randomize the positions and velocities in the range [-1, 1],
 // and assign a mass (every 7th float) in the range [0.1, 1.0].
-int randomizeBodies(PhiloxEngine &rng, Body *bodies, int n) {
-  int maxKeyLength = sizeof(Key) * 8;
+void randomizeBodies(PhiloxEngine &rng, Body *bodies, int n) {
   std::uniform_real_distribution<float> x_dis(0, 1);
   std::uniform_real_distribution<float> v_dis(0, 1);
 
@@ -58,13 +58,32 @@ int randomizeBodies(PhiloxEngine &rng, Body *bodies, int n) {
     body.vz = (v_dis(rng)) * 2 - 1;
     body.m = (v_dis(rng)) + 0.1f;
   }
-  std::cout << "the maximum key length is = " << maxKeyLength << std::endl;
-
-  return maxKeyLength;
 }
 
-int MACInteractionsDFT(std::vector<DFTNode> dft, Body *bodies, float dt,
-                       int nBodies) {
+void createOctree(std::vector<DFTNode> &dft, Octree *octree, Body *bodies,
+                  int nBodies) {
+
+  int nUniqueLeaves = 0;
+  for (int i = 0; i < nBodies; i++) {
+    nUniqueLeaves += octree->insert(bodies[i]);
+  }
+  octree->buildDFT(dft, bodies);
+  // printf("Octree built with %d buckets (leaves with unique key)\n",
+  //        nUniqueLeaves);
+  // octree->printTree(octree->root, 0);
+
+  printf("Octree created with %d nodes\n", octree->root->subTreeSize);
+  // octree->printTree(octree->root, 0);
+  assert(octree->root->nLeaves == nBodies);
+}
+
+int MACInteractionsDFT(Body *bodies, float dt, int nBodies) {
+
+  Octree *octree = new Octree(MAX_KEY_LENGTH);
+  std::vector<DFTNode> dft;
+
+  createOctree(dft, octree, bodies, nBodies);
+
   // iterate over all bodies (targets)
   int nInteractions = 0;
   for (int target = 0; target < nBodies; target++) {
@@ -105,11 +124,17 @@ int MACInteractionsDFT(std::vector<DFTNode> dft, Body *bodies, float dt,
     bodies[target].vy += dt * Fy;
     bodies[target].vz += dt * Fz;
   }
+
+  delete octree;
   return nInteractions;
 }
 
-int allInteractionsDFT(std::vector<DFTNode> dft, Body *bodies, float dt,
-                       int nBodies) {
+int allInteractionsDFT(Body *bodies, float dt, int nBodies) {
+  Octree *octree = new Octree(MAX_KEY_LENGTH);
+  std::vector<DFTNode> dft;
+
+  createOctree(dft, octree, bodies, nBodies);
+
   // iterate over all bodies (targets)
   int nInteractions = 0;
   for (int target = 0; target < nBodies; target++) {
@@ -137,6 +162,9 @@ int allInteractionsDFT(std::vector<DFTNode> dft, Body *bodies, float dt,
     bodies[target].vz += dt * Fz;
   }
   return nInteractions;
+
+  delete octree;
+  dft.clear();
 }
 
 void allInteractionsDS(Body *bodies, float dt, int nBodies) {
@@ -170,13 +198,13 @@ void allInteractionsDS(Body *bodies, float dt, int nBodies) {
   }
 }
 
-void bodyForce(Body *p, float dt, int n, std::vector<DFTNode> dft) {
+void bodyForce(Body *p, float dt, int n) {
 
   int nInteractions = 0;
   if (USE_TREE && USE_BH)
-    nInteractions = MACInteractionsDFT(dft, p, dt, n);
+    nInteractions = MACInteractionsDFT(p, dt, n);
   else if (USE_TREE)
-    nInteractions = allInteractionsDFT(dft, p, dt, n);
+    nInteractions = allInteractionsDFT(p, dt, n);
   else {
     nInteractions = n * n;
     allInteractionsDS(p, dt, n);
@@ -193,39 +221,12 @@ void integratePositions(Body *p, float dt, int start, int end) {
   }
 }
 
-void nbodyIterate(Body *p, float dt, int nBodies, int nIters,
-                  int maxkeylength) {
+void nbodyIterate(Body *p, float dt, int nBodies, int nIters) {
   double totalTime = 0.0;
   ctimer_t timer;
   for (int iter = 1; iter <= nIters; iter++) {
-
-    std::vector<DFTNode> dft;
-
-    Octree *octree;
-
     ctimer_start(&timer);
-
-    // Reconstruct octree in every timestep
-    if (USE_TREE) {
-      octree = new Octree(maxkeylength);
-      int nUniqueLeaves = 0;
-      for (int i = 0; i < nBodies; i++) {
-        nUniqueLeaves += octree->insert(p[i]);
-      }
-      octree->buildDFT(dft, p);
-      // printf("Octree built with %d buckets (leaves with unique key)\n",
-      //        nUniqueLeaves);
-      // octree->printTree(octree->root, 0);
-
-      printf("Octree created with %d nodes\n", octree->root->subTreeSize);
-      // octree->printTree(octree->root, 0);
-      assert(octree->root->nLeaves == nBodies);
-    }
-
-    bodyForce(p, dt, nBodies, dft);
-
-    if (USE_TREE)
-      delete octree;
+    bodyForce(p, dt, nBodies);
 
     // Integrate positions
     integratePositions(p, dt, 0, nBodies);
@@ -277,7 +278,7 @@ void checkAccuracy(Body *p, Body *orig, int nBodies, int nIters) {
   USE_TREE = false;
   USE_BH = false;
   PRINT_TIME = false;
-  nbodyIterate(orig, 0.01f, nBodies, nIters, 0);
+  nbodyIterate(orig, 0.01f, nBodies, nIters);
   PRINT_TIME = true;
   // Compute RMS error(standard check for positional accuracy)
   float rmsError = 0.0f;
@@ -368,7 +369,7 @@ int main(const int argc, const char **argv) {
 
   // Initialize positions, velocities, and masses (7 values per body)
   PhiloxEngine rng(2025);
-  int maxkeylength = randomizeBodies(rng, particles, nBodies);
+  randomizeBodies(rng, particles, nBodies);
 
   // make a copy of bodies for accuracy check
   Body *particles_cp = new Body[nBodies];
@@ -376,7 +377,7 @@ int main(const int argc, const char **argv) {
     particles_cp[i] = particles[i];
   }
 
-  nbodyIterate(particles, dt, nBodies, nIters, maxkeylength);
+  nbodyIterate(particles, dt, nBodies, nIters);
   checkAccuracy(particles, particles_cp, nBodies, nIters);
 
   delete[] particles;
