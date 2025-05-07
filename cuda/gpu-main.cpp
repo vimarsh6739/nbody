@@ -9,7 +9,7 @@
 
 #include <string>
 
-#include "cpu-core.h"
+#include "gpu-core.h"
 
 float SOFTENING = 1e-9f;
 
