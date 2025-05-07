@@ -8,12 +8,6 @@ EXECUTABLE=cpu_nbody
 CILK_WORKERS=${1:-4}
 FLAMEGRAPH_DIR=FlameGraph
 
-# === Check FlameGraph Tools ===
-if [ ! -d "$FLAMEGRAPH_DIR" ]; then
-    echo "[+] Cloning FlameGraph..."
-    git clone https://github.com/brendangregg/FlameGraph.git
-fi
-
 # === Build ===
 echo "[+] Building project..."
 mkdir -p $BUILD_DIR
