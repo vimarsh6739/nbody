@@ -35,7 +35,7 @@ target_link_libraries(cpu_nbody PRIVATE Threads::Threads)
 if(DEFINED ENV{CILK_CLANG})
   target_link_options(cpu_nbody PRIVATE -fopencilk)
   target_compile_options(cpu_nbody PRIVATE -fopencilk)
-  target_compile_options(my_app PRIVATE -DENABLE_CILK)
+  target_compile_options(cpu_nbody PRIVATE -DENABLE_CILK)
 endif()
 
 

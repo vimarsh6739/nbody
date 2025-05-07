@@ -68,8 +68,9 @@ int MACInteractionsDFT(Body *bodies, float dt, int nBodies,
 
 #ifdef ENABLE_CILK
   cilk_for(int target = 0; target < nBodies; target++) {
+#else
+  for (int target = 0; target < nBodies; target++) {
 #endif
-  for(int target = 0; target < nBodies; target++) {
     float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
     for (int j = 0; j < dft.size(); j++) {
       if (dft[j].isLeaf) {
@@ -119,8 +120,9 @@ int allInteractionsDFT(Body *bodies, float dt, int nBodies,
 
 #ifdef ENABLE_CILK
   cilk_for(int target = 0; target < nBodies; target++) {
+#else
+  for (int target = 0; target < nBodies; target++) {
 #endif
-  for(int target = 0; target < nBodies; target++) {
     float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
 
     for (int j = 0; j < dft.size(); j++) {
@@ -152,8 +154,9 @@ void allInteractionsDS(Body *bodies, float dt, int nBodies) {
 
 #ifdef ENABLE_CILK
   cilk_for(int i = 0; i < n; ++i) {
+#else
+  for (int i = 0; i < n; ++i) {
 #endif
-  for(int i = 0; i < n; ++i) {
     float Fx = 0.0;
     float Fy = 0.0;
     float Fz = 0.0;
