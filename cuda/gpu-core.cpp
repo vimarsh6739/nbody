@@ -4,7 +4,15 @@
 
 #include <random>
 
+#ifdef ENABLE_CUDA
+bool CUDA = true;
+#else
+bool CUDA = false;
+#endif
+
 // Define all CLI options
+
+extern int launchDS(Body *bodies, float dt, int nBodies);
 
 bool MAC(float target_x, float target_y, float target_z, float x, float y,
          float z, float mass) {
@@ -167,6 +175,7 @@ float checkAccuracy(Body *p, Body *orig, int nBodies, int nIters) {
   USE_TREE = false;
   USE_BH = false;
   PRINT_TIME = false;
+  CUDA = false;
   nbodyIterate(orig, 0.01f, nBodies, nIters);
   PRINT_TIME = true;
   // Compute RMS error(standard check for positional accuracy)
@@ -228,7 +237,9 @@ int bodyForce(Body *p, float dt, int n, std::vector<DFTNode> dft) {
     MACInteractionsDFT(p, dt, n, dft);
   else if (USE_TREE)
     allInteractionsDFT(p, dt, n, dft);
-  else {
+  else if (CUDA)
+    launchDS(p, dt, n);
+  else
     allInteractionsDS(p, dt, n);
   }
 

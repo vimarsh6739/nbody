@@ -4,16 +4,10 @@ set(GPU_SOURCES
     gpu-core.cpp
     ../common/octree.cpp
     ../common/philox_rng.cpp
+    kernels.cu
 )
 
 
-# Create shared library for the core components (for tests to use)
-add_library(gpu_nbody_core STATIC
-    ../common/octree.cpp
-    ../common/philox_rng.cpp
-    gpu-core.cpp
-    gpu-main.cpp
-)
 
 if (NOT CUDA_AVAILABLE)
     message(FATAL_ERROR "CUDA is not available. GPU implementation cannot be built.")   
@@ -26,4 +20,14 @@ set_target_properties(gpu_nbody PROPERTIES
     CUDA_SEPARABLE_COMPILATION ON
 )
 target_link_libraries(gpu_nbody PRIVATE CUDA::cudart)
+target_compile_options(gpu_nbody PRIVATE -DENABLE_CUDA)
 
+
+# Create shared library for the core components (for tests to use)
+add_library(gpu_nbody_core STATIC
+    ../common/octree.cpp
+    ../common/philox_rng.cpp
+    gpu-core.cpp
+    gpu-main.cpp
+    kernels.cu
+)
