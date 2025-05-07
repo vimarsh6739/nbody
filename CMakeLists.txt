@@ -23,8 +23,8 @@ find_package(Threads REQUIRED)
 
 # Check for CUDA
 find_package(CUDAToolkit)
-if(CUDAToolkit_FOUND AND ENV{ENABLE_CUDA})
-    enable_language(CUDA)
+if(CUDAToolkit_FOUND AND DEFINED ENV{ENABLE_CUDA})
+  enable_language(CUDA)
     set(CUDA_AVAILABLE TRUE)
     
     set(CMAKE_CUDA_STANDARD 17)
@@ -42,7 +42,7 @@ if(CUDAToolkit_FOUND AND ENV{ENABLE_CUDA})
     set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --extended-lambda")
     
     message(STATUS "CUDA available, building GPU version")
-    add_subdirectory(cuda)
+
 else()
     set(CUDA_AVAILABLE FALSE)
     message(STATUS "CUDA not available (or not enabled. set ENABLE_CUDA), skipping GPU version")
@@ -65,6 +65,9 @@ include_directories(${CMAKE_SOURCE_DIR}/common)
 
 # Add subdirectories
 add_subdirectory(src)
+if(CUDAToolkit_FOUND AND DEFINED ENV{ENABLE_CUDA})
+  add_subdirectory(cuda)
+endif()
 
 # Testing
 if(BUILD_TESTING)
