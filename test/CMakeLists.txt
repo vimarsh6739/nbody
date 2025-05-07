@@ -6,7 +6,7 @@ add_executable(cpu_test
 # Link against our core library and Google Test
 target_link_libraries(cpu_test
     PRIVATE
-    nbody_core
+    cpu_nbody_core
     gtest
     gtest_main
 )

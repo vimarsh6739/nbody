@@ -42,6 +42,7 @@ if(CUDAToolkit_FOUND AND ENV{ENABLE_CUDA})
     set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --extended-lambda")
     
     message(STATUS "CUDA available, building GPU version")
+    add_subdirectory(cuda)
 else()
     set(CUDA_AVAILABLE FALSE)
     message(STATUS "CUDA not available (or not enabled. set ENABLE_CUDA), skipping GPU version")
@@ -60,6 +61,7 @@ FetchContent_Declare(
 
 # Include directories
 include_directories(${CMAKE_SOURCE_DIR}/src)
+include_directories(${CMAKE_SOURCE_DIR}/common)
 
 # Add subdirectories
 add_subdirectory(src)
