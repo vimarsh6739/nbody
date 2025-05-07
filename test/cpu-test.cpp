@@ -3,7 +3,7 @@
 #include <gtest/gtest.h>
 #include <string>
 
-#include "cpu-core.h"
+#include "main.h"
 
 // Test getKeyfunction
 TEST(OctreeTest, GetKey) {
