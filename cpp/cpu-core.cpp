@@ -66,6 +66,11 @@ int MACInteractionsDFT(Body *bodies, float dt, int nBodies,
   // iterate over all bodies (targets)
   int nInteractions = 0;
 
+  Body *bodies_copy = new Body[nBodies];
+  for (int i = 0; i < nBodies; ++i) {
+    bodies_copy[i] = bodies[i];
+  }
+
 #ifdef ENABLE_CILK
   cilk_for(int target = 0; target < nBodies; target++) {
 #else
@@ -109,11 +114,13 @@ int MACInteractionsDFT(Body *bodies, float dt, int nBodies,
       }
     }
 
-    bodies[target].vx += dt * Fx;
-    bodies[target].vy += dt * Fy;
-    bodies[target].vz += dt * Fz;
+    bodies_copy[target].vx += dt * Fx;
+    bodies_copy[target].vy += dt * Fy;
+    bodies_copy[target].vz += dt * Fz;
   }
 
+  delete[] bodies;
+  bodies = bodies_copy;
   return nInteractions;
 }
 
@@ -122,6 +129,11 @@ int allInteractionsDFT(Body *bodies, float dt, int nBodies,
 
   // iterate over all bodies (targets)
   int nInteractions = 0;
+
+  Body *bodies_copy = new Body[nBodies];
+  for (int i = 0; i < nBodies; ++i) {
+    bodies_copy[i] = bodies[i];
+  }
 
 #ifdef ENABLE_CILK
   cilk_for(int target = 0; target < nBodies; target++) {
@@ -149,15 +161,23 @@ int allInteractionsDFT(Body *bodies, float dt, int nBodies,
         }
       }
     }
-    bodies[target].vx += dt * Fx;
-    bodies[target].vy += dt * Fy;
-    bodies[target].vz += dt * Fz;
+    bodies_copy[target].vx += dt * Fx;
+    bodies_copy[target].vy += dt * Fy;
+    bodies_copy[target].vz += dt * Fz;
   }
+
+  delete[] bodies;
+  bodies = bodies_copy;
   return nInteractions;
 }
 
 void allInteractionsDS(Body *bodies, float dt, int nBodies) {
   int n = nBodies;
+
+  Body *bodies_copy = new Body[n];
+  for (int i = 0; i < n; ++i) {
+    bodies_copy[i] = bodies[i];
+  }
 
 #ifdef ENABLE_CILK
   cilk_for(int i = 0; i < n; ++i) {
@@ -184,10 +204,13 @@ void allInteractionsDS(Body *bodies, float dt, int nBodies) {
     }
 
     // update velocity
-    bodies[i].vx += dt * Fx;
-    bodies[i].vy += dt * Fy;
-    bodies[i].vz += dt * Fz;
+    bodies_copy[i].vx += dt * Fx;
+    bodies_copy[i].vy += dt * Fy;
+    bodies_copy[i].vz += dt * Fz;
   }
+
+  delete[] bodies;
+  bodies = bodies_copy;
 }
 
 float checkAccuracy(Body *p, Body *orig, int nBodies, int nIters) {
