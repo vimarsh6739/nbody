@@ -22,9 +22,7 @@ if(DEFINED ENV{CILK_CLANG})
 
     set(CMAKE_CXX_COMPILER ${CILK_COMPILER})
     add_compile_options(-fopencilk)  # Enable OpenCilk extensions
-    
-
-     # Link with OpenCilk runtime (cilkrts)
+         # Link with OpenCilk runtime (cilkrts)
     
 else()
     message(WARNING "OpenCilk compiler not found, building without Cilk")
@@ -33,8 +31,12 @@ endif()
 # Create CPU executable
 add_executable(cpu_nbody ${CPU_SOURCES})
 target_link_libraries(cpu_nbody PRIVATE Threads::Threads)
-target_link_options(cpu_nbody PRIVATE -fopencilk)
-target_compile_options(cpu_nbody PRIVATE -fopencilk)
+
+if(DEFINED ENV{CILK_CLANG})
+  target_link_options(cpu_nbody PRIVATE -fopencilk)
+  target_compile_options(cpu_nbody PRIVATE -fopencilk)
+  target_compile_options(my_app PRIVATE -DENABLE_CILK)
+endif()
 
 
 # Create shared library for the core components (for tests to use)

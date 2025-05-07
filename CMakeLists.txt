@@ -23,7 +23,7 @@ find_package(Threads REQUIRED)
 
 # Check for CUDA
 find_package(CUDAToolkit)
-if(CUDAToolkit_FOUND)
+if(CUDAToolkit_FOUND AND ENV{ENABLE_CUDA})
     enable_language(CUDA)
     set(CUDA_AVAILABLE TRUE)
     
@@ -44,7 +44,7 @@ if(CUDAToolkit_FOUND)
     message(STATUS "CUDA available, building GPU version")
 else()
     set(CUDA_AVAILABLE FALSE)
-    message(STATUS "CUDA not available, skipping GPU version")
+    message(STATUS "CUDA not available (or not enabled. set ENABLE_CUDA), skipping GPU version")
 endif()
 
 # Options

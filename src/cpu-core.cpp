@@ -1,7 +1,10 @@
 #include "cpu-core.h"
 #include "ctimer.h"
 #include <assert.h>
+
+#ifdef ENABLE_CILK
 #include <cilk/cilk.h>
+#endif
 #include <random>
 
 // Define all CLI options
@@ -62,7 +65,11 @@ int MACInteractionsDFT(Body *bodies, float dt, int nBodies,
 
   // iterate over all bodies (targets)
   int nInteractions = 0;
+
+#ifdef ENABLE_CILK
   cilk_for(int target = 0; target < nBodies; target++) {
+#endif
+  for(int target = 0; target < nBodies; target++) {
     float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
     for (int j = 0; j < dft.size(); j++) {
       if (dft[j].isLeaf) {
@@ -109,7 +116,11 @@ int allInteractionsDFT(Body *bodies, float dt, int nBodies,
 
   // iterate over all bodies (targets)
   int nInteractions = 0;
+
+#ifdef ENABLE_CILK
   cilk_for(int target = 0; target < nBodies; target++) {
+#endif
+  for(int target = 0; target < nBodies; target++) {
     float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
 
     for (int j = 0; j < dft.size(); j++) {
@@ -139,8 +150,10 @@ int allInteractionsDFT(Body *bodies, float dt, int nBodies,
 void allInteractionsDS(Body *bodies, float dt, int nBodies) {
   int n = nBodies;
 
+#ifdef ENABLE_CILK
   cilk_for(int i = 0; i < n; ++i) {
-
+#endif
+  for(int i = 0; i < n; ++i) {
     float Fx = 0.0;
     float Fy = 0.0;
     float Fz = 0.0;
