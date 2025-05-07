@@ -225,13 +225,14 @@ void nbodyIterate(Body *p, float dt, int nBodies, int nIters) {
 int bodyForce(Body *p, float dt, int n, std::vector<DFTNode> dft) {
 
   if (USE_TREE && USE_BH)
-    return MACInteractionsDFT(p, dt, n, dft);
+    MACInteractionsDFT(p, dt, n, dft);
   else if (USE_TREE)
-    return allInteractionsDFT(p, dt, n, dft);
+    allInteractionsDFT(p, dt, n, dft);
   else {
     allInteractionsDS(p, dt, n);
-    return n * n;
   }
+
+  return 0;
 }
 
 void integratePositions(Body *p, float dt, int start, int end) {
