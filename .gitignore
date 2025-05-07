@@ -8,7 +8,7 @@ opencilk-build
 compile_commands.json
 .cache
 *.o
-
+*.out
 #binaries
 fib
 nbody
@@ -17,6 +17,7 @@ cpu_nbody
 gpu_nbody
 
 #folders
+.vscode
 obj
 obj_gpu
 build
