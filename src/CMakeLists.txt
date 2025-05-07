@@ -9,7 +9,7 @@ set(CPU_SOURCES
 
 # Check for OpenCilk (clang with cilk support)
 # Use the environment variable to find OpenCilk's clang++
-if(DEFINED ENV{CILK_CLANG})
+if(DEFINED ENV{CILK_CLANG} AND ("$ENV{ENABLE_CILK}" STREQUAL "1"))
     set(CILK_COMPILER $ENV{CILK_CLANG})
     message(STATUS "OpenCilk compiler found: ${CILK_COMPILER}")
     
@@ -32,7 +32,7 @@ endif()
 add_executable(cpu_nbody ${CPU_SOURCES})
 target_link_libraries(cpu_nbody PRIVATE Threads::Threads)
 
-if(DEFINED ENV{CILK_CLANG})
+if(DEFINED ENV{CILK_CLANG} AND ("$ENV{ENABLE_CILK}" STREQUAL "1"))
   target_link_options(cpu_nbody PRIVATE -fopencilk)
   target_compile_options(cpu_nbody PRIVATE -fopencilk)
   target_compile_options(cpu_nbody PRIVATE -DENABLE_CILK)
@@ -47,22 +47,3 @@ add_library(cpu_nbody_core STATIC
     cpu-main.cpp
 )
 
-
-
-# GPU implementation (if CUDA is available)
-# if(CUDA_AVAILABLE)
-    
-#     # GPU sources (CUDA and C++)
-#     set(GPU_SOURCES
-#         gpu-main.cu
-#         octree.cpp
-#         philox_rng.cpp
-#     )
-    
-#     # Create GPU executable
-#     add_executable(gpu_nbody ${GPU_SOURCES})
-#     set_target_properties(gpu_nbody PROPERTIES 
-#         CUDA_SEPARABLE_COMPILATION ON
-#     )
-#     target_link_libraries(gpu_nbody PRIVATE CUDA::cudart)
-# endif()

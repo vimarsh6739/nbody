@@ -75,7 +75,10 @@ int MACInteractionsDFT(Body *bodies, float dt, int nBodies,
     for (int j = 0; j < dft.size(); j++) {
       if (dft[j].isLeaf) {
         for (int bIndex : dft[j].bodies) {
+
+#ifndef ENABLE_CILK
           nInteractions++;
+#endif
           float dx = bodies[bIndex].x - bodies[target].x;
           float dy = bodies[bIndex].y - bodies[target].y;
           float dz = bodies[bIndex].z - bodies[target].z;
@@ -89,7 +92,9 @@ int MACInteractionsDFT(Body *bodies, float dt, int nBodies,
         }
       } else if (MAC(bodies[target].x, bodies[target].y, bodies[target].z,
                      dft[j].x, dft[j].y, dft[j].z, dft[j].mass)) {
+#ifndef ENABLE_CILK
         nInteractions++;
+#endif
         float dx = dft[j].x - bodies[target].x;
         float dy = dft[j].y - bodies[target].y;
         float dz = dft[j].z - bodies[target].z;
@@ -128,7 +133,9 @@ int allInteractionsDFT(Body *bodies, float dt, int nBodies,
     for (int j = 0; j < dft.size(); j++) {
       if (dft[j].isLeaf) {
         for (int bIndex : dft[j].bodies) {
+#ifndef ENABLE_CILK
           nInteractions++;
+#endif
           float dx = bodies[bIndex].x - bodies[target].x;
           float dy = bodies[bIndex].y - bodies[target].y;
           float dz = bodies[bIndex].z - bodies[target].z;
@@ -232,7 +239,12 @@ void nbodyIterate(Body *p, float dt, int nBodies, int nIters) {
     if (iter > 1)
       totalTime += tElapsed;
 
+#ifdef ENABLE_CILK
     printf("Iteration %d: time = %.3f seconds\n", iter, tElapsed);
+#else
+    printf("Iteration %d: time = %.3f seconds, %d interactions\n", iter,
+           tElapsed, nInteractions);
+#endif
   }
 
   double avgTime = totalTime / (double)(nIters - 1);
