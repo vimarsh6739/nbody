@@ -3,6 +3,7 @@ set(CPU_SOURCES
     cpu-main.cpp
     octree.cpp
     philox_rng.cpp
+    cpu-core.cpp
 )
 
 # Create CPU executable
@@ -13,6 +14,7 @@ target_link_libraries(cpu_nbody PRIVATE Threads::Threads)
 add_library(nbody_core STATIC
     octree.cpp
     philox_rng.cpp
+    cpu-core.cpp
 )
 
 # GPU implementation (if CUDA is available)
