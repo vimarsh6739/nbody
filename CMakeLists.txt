@@ -1,4 +1,16 @@
 cmake_minimum_required(VERSION 3.18)
+
+# Check for OpenCilk (clang with cilk support)
+if(ENABLE_CILK)
+    if(DEFINED ENV{CILK_CLANG})
+        set(CILK_COMPILER $ENV{CILK_CLANG})
+        message(STATUS "OpenCilk compiler found: ${CILK_COMPILER}")
+        set(CMAKE_CXX_COMPILER ${CILK_COMPILER})
+    else()
+        message(WARNING "OpenCilk compiler not found, building without Cilk")
+    endif()
+endif()
+
 project(nbody_simulation LANGUAGES CXX C)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -16,7 +28,7 @@ endif()
 # Set compiler flags for different build types
 set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O2")
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -fno-omit-frame-pointer")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -fno-omit-frame-pointer")
 
 # system threads
 find_package(Threads REQUIRED)
@@ -50,6 +62,7 @@ endif()
 
 # Options
 option(BUILD_TESTING "Build tests" ON)
+option(ENABLE_CILK "Enable Cilk based parallelization" ON)
 
 # Add Google Test
 include(FetchContent)
@@ -63,6 +76,7 @@ FetchContent_Declare(
 include_directories(${CMAKE_SOURCE_DIR}/common)
 
 # Add subdirectories
+add_subdirectory(common)
 add_subdirectory(cpp)
 if(CUDAToolkit_FOUND AND DEFINED ENV{ENABLE_CUDA})
   add_subdirectory(cuda)

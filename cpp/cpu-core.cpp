@@ -17,3 +17,7 @@ int bodyForce(Body *p, float dt, int n, std::vector<DFTNode> dft) {
     return n * n;
   }
 }
+
+int main(const int argc, const char **argv) {
+  return libMain(argc, argv);
+}

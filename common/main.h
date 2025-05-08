@@ -26,3 +26,4 @@ int MACInteractionsDFT(Body *bodies, float dt, int nBodies,
                        std::vector<DFTNode> &dft);
 int allInteractionsDFT(Body *bodies, float dt, int nBodies,
                        std::vector<DFTNode> &dft);
+int libMain(const int argc, const char **argv);

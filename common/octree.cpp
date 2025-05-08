@@ -1,8 +1,8 @@
 #include "octree.h"
-#include <assert.h>
+#include <cassert>
 #include <cstdlib>
-#include <math.h>
-#include <stdio.h>
+#include <cmath>
+#include <cstdio>
 #include <string>
 
 #define SHIFT_DIGITS 20

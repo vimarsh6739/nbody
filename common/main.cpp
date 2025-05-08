@@ -305,7 +305,7 @@ void nbodyIterate(Body *p, float dt, int nBodies, int nIters) {
   }
 }
 
-int main(const int argc, const char **argv) {
+int libMain(const int argc, const char **argv) {
 
   cxxopts::Options options(argv[0], "Run n-body simulations on the CPU");
   options.add_options()("n,nbodies", "Number of bodies",
