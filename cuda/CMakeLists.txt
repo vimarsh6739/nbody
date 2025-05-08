@@ -1,33 +1,27 @@
-# CPU implementation sources
-set(GPU_SOURCES
-    ../common/main.cpp
-    gpu-core.cpp
-    ../common/octree.cpp
-    ../common/philox_rng.cpp
-    kernels.cu
+set(GPU_SRCS
+  gpu-core.cu
 )
 
+# Create CPU executable
+add_executable(gpu_nbody ${GPU_SRCS} gpu-main.cu)
 
+# Create shared library for the core components (for unit tests)
+add_library(gpu_nbody_core STATIC ${GPU_SRCS})
 
-if (NOT CUDA_AVAILABLE)
-    message(FATAL_ERROR "CUDA is not available. GPU implementation cannot be built.")   
-endif()
+set(GPU_LIBS 
+  nbody_common 
+  CUDA::cudart
+)
 
-
-# Create GPU executable
-add_executable(gpu_nbody ${GPU_SOURCES})
 set_target_properties(gpu_nbody PROPERTIES 
-    CUDA_SEPARABLE_COMPILATION ON
+  CUDA_SEPARABLE_COMPILATION ON
 )
-target_link_libraries(gpu_nbody PRIVATE CUDA::cudart)
-target_compile_options(gpu_nbody PRIVATE -DENABLE_CUDA)
 
+# adds "#define ENABLE_CUDA" during compilation
+target_compile_definitions(cpu_nbody PRIVATE ENABLE_CUDA)
+target_compile_definitions(cpu_nbody_core PRIVATE ENABLE_CUDA)
 
-# Create shared library for the core components (for tests to use)
-add_library(gpu_nbody_core STATIC
-    ../common/octree.cpp
-    ../common/philox_rng.cpp
-    gpu-core.cpp
-    ../common/main.cpp
-    kernels.cu
-)
+# link against the libs we need here
+target_link_libraries(gpu_nbody PRIVATE ${GPU_LIBS})
+target_link_libraries(gpu_nbody_core PRIVATE ${GPU_LIBS})
+
