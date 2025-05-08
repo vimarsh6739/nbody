@@ -32,27 +32,20 @@ extern bool CUDA = false;
 
 bool MAC(float target_x, float target_y, float target_z, float x, float y,
          float z, float mass) {
-
-  float distance =
-      sqrtf((target_x - x) * (target_x - x) + (target_y - y) * (target_y - y) +
-            (target_z - z) * (target_z - z));
-  float source_mass = mass;
-
-  bool result = distance > MAC_PARAM;
-
-  return distance / source_mass > MAC_PARAM;
+  float dx = target_x - x;
+  float dy = target_y - y;
+  float dz = target_z - z;
+  float distance = sqrtf(dx * dx + dy * dy + dz * dz);
+  float size = mass;
+  
+  return size / distance < MAC_PARAM;
 }
 
 int allInteractionsDFT(Body *bodies, float dt, int nBodies,
                        std::vector<DFTNode> &dft) {
-
-  // iterate over all bodies (targets)
   int nInteractions = 0;
-
-  Body *bodies_copy = new Body[nBodies];
-  for (int i = 0; i < nBodies; ++i) {
-    bodies_copy[i] = bodies[i];
-  }
+  
+  std::vector<float> new_vx(nBodies), new_vy(nBodies), new_vz(nBodies);
 
 #ifdef ENABLE_CILK
   cilk_for(int target = 0; target < nBodies; target++) {
@@ -64,6 +57,7 @@ int allInteractionsDFT(Body *bodies, float dt, int nBodies,
     for (int j = 0; j < dft.size(); j++) {
       if (dft[j].isLeaf) {
         for (int bIndex : dft[j].bodies) {
+          if (bIndex == target) continue;
 #ifndef ENABLE_CILK
           nInteractions++;
 #endif
@@ -80,35 +74,33 @@ int allInteractionsDFT(Body *bodies, float dt, int nBodies,
         }
       }
     }
-    bodies_copy[target].vx += dt * Fx;
-    bodies_copy[target].vy += dt * Fy;
-    bodies_copy[target].vz += dt * Fz;
+    
+    new_vx[target] = bodies[target].vx + dt * Fx;
+    new_vy[target] = bodies[target].vy + dt * Fy;
+    new_vz[target] = bodies[target].vz + dt * Fz;
   }
 
-  delete[] bodies;
-  bodies = bodies_copy;
+  for (int i = 0; i < nBodies; i++) {
+    bodies[i].vx = new_vx[i];
+    bodies[i].vy = new_vy[i];
+    bodies[i].vz = new_vz[i];
+  }
+
   return nInteractions;
 }
 
 void allInteractionsDS(Body *bodies, float dt, int nBodies) {
-  int n = nBodies;
-
-  Body *bodies_copy = new Body[n];
-  for (int i = 0; i < n; ++i) {
-    bodies_copy[i] = bodies[i];
-  }
+  std::vector<float> new_vx(nBodies), new_vy(nBodies), new_vz(nBodies);
 
 #ifdef ENABLE_CILK
-  cilk_for(int i = 0; i < n; ++i) {
+  cilk_for(int i = 0; i < nBodies; ++i) {
 #else
-  for (int i = 0; i < n; ++i) {
+  for (int i = 0; i < nBodies; ++i) {
 #endif
-    float Fx = 0.0;
-    float Fy = 0.0;
-    float Fz = 0.0;
+    float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
 
-    // compute force, update velocities
-    for (int j = 0; j < n; ++j) {
+    for (int j = 0; j < nBodies; ++j) {
+      if (i == j) continue;
 
       float dx = bodies[j].x - bodies[i].x;
       float dy = bodies[j].y - bodies[i].y;
@@ -122,28 +114,23 @@ void allInteractionsDS(Body *bodies, float dt, int nBodies) {
       Fz += dz * bodies[j].m * invDist3;
     }
 
-    // update velocity
-    bodies_copy[i].vx += dt * Fx;
-    bodies_copy[i].vy += dt * Fy;
-    bodies_copy[i].vz += dt * Fz;
+    new_vx[i] = bodies[i].vx + dt * Fx;
+    new_vy[i] = bodies[i].vy + dt * Fy;
+    new_vz[i] = bodies[i].vz + dt * Fz;
   }
 
-  delete[] bodies;
-  bodies = bodies_copy;
+  for (int i = 0; i < nBodies; i++) {
+    bodies[i].vx = new_vx[i];
+    bodies[i].vy = new_vy[i];
+    bodies[i].vz = new_vz[i];
+  }
 }
 
 int MACInteractionsDFT(Body *bodies, float dt, int nBodies,
                        std::vector<DFTNode> &dft) {
-
-  // iterate over all bodies (targets)
-
-  // iterate over all bodies (targets)
   int nInteractions = 0;
-
-  Body *bodies_copy = new Body[nBodies];
-  for (int i = 0; i < nBodies; ++i) {
-    bodies_copy[i] = bodies[i];
-  }
+  
+  std::vector<float> new_vx(nBodies), new_vy(nBodies), new_vz(nBodies);
 
 #ifdef ENABLE_CILK
   cilk_for(int target = 0; target < nBodies; target++) {
@@ -151,10 +138,11 @@ int MACInteractionsDFT(Body *bodies, float dt, int nBodies,
   for (int target = 0; target < nBodies; target++) {
 #endif
     float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
-    for (int j = 0; j < dft.size(); j++) {
+    
+    for (size_t j = 0; j < dft.size(); j++) {
       if (dft[j].isLeaf) {
         for (int bIndex : dft[j].bodies) {
-
+          if (bIndex == target) continue;
 #ifndef ENABLE_CILK
           nInteractions++;
 #endif
@@ -184,17 +172,26 @@ int MACInteractionsDFT(Body *bodies, float dt, int nBodies,
         Fx += dx * dft[j].mass * invDist3;
         Fy += dy * dft[j].mass * invDist3;
         Fz += dz * dft[j].mass * invDist3;
-        j = dft[j].autorope - 1; // -1 because we increment j in the for loop
+        
+        if (dft[j].autorope < dft.size()) {
+          j = dft[j].autorope - 1;
+        } else {
+          break;
+        }
       }
     }
 
-    bodies_copy[target].vx += dt * Fx;
-    bodies_copy[target].vy += dt * Fy;
-    bodies_copy[target].vz += dt * Fz;
+    new_vx[target] = bodies[target].vx + dt * Fx;
+    new_vy[target] = bodies[target].vy + dt * Fy;
+    new_vz[target] = bodies[target].vz + dt * Fz;
   }
 
-  delete[] bodies;
-  bodies = bodies_copy;
+  for (int i = 0; i < nBodies; i++) {
+    bodies[i].vx = new_vx[i];
+    bodies[i].vy = new_vy[i];
+    bodies[i].vz = new_vz[i];
+  }
+
   return nInteractions;
 }
 
