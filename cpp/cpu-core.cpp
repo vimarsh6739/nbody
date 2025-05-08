@@ -35,7 +35,10 @@ bool MAC(float target_x, float target_y, float target_z, float x, float y,
   float dx = target_x - x;
   float dy = target_y - y;
   float dz = target_z - z;
-  float distance = sqrtf(dx * dx + dy * dy + dz * dz);
+  // float distance = sqrtf(dx * dx + dy * dy + dz * dz); // this uses L2 norm
+  // float distance = abs(dx) + abs(dy) + abs(dz); // this uses L1 norm
+  float distance = (dx * dx + dy * dy + dz * dz); // uses L2 norm squared
+
   float size = mass;
   
   return size / distance < MAC_PARAM;
