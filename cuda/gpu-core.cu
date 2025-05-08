@@ -9,13 +9,9 @@
 #include <random>
 #include <string>
 
-#ifdef ENABLE_CILK
-#include <cilk/cilk.h>
-#endif
 #include <random>
 
 float SOFTENING = 1e-9f;
-
 bool USE_TREE = false; // use tree or list
 bool USE_BH = true;    // use barnes hut or not
 bool PRINT_TIME = true;
@@ -23,12 +19,6 @@ float MAC_PARAM = .5; // MAC parameter
 
 int SHIFT_DIGITS = 16;
 int MAX_KEY_LENGTH = sizeof(Key) * 8;
-
-#ifdef ENABLE_CUDA
-extern bool CUDA = true;
-#else
-extern bool CUDA = false;
-#endif
 
 bool MAC(float target_x, float target_y, float target_z, float x, float y,
          float z, float mass) {
@@ -240,7 +230,6 @@ float checkAccuracy(Body *p, Body *orig, int nBodies, int nIters) {
   USE_TREE = false;
   USE_BH = false;
   PRINT_TIME = false;
-  CUDA = false;
   nbodyIterate(orig, 0.01f, nBodies, nIters);
   PRINT_TIME = true;
 
