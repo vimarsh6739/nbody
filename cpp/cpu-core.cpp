@@ -110,7 +110,7 @@ void allInteractionsDS(Body *bodies, float dt, int nBodies) {
       float dz = bodies[j].z - bodies[i].z;
       float distSqr = dx * dx + dy * dy + dz * dz + SOFTENING;
       float invDist = 1.0f / sqrtf(distSqr);
-      float invDist3 = invDist * invDist * invDist;
+      float invDist3 = invDist * invDist * invDist; 
 
       Fx += dx * bodies[j].m * invDist3;
       Fy += dy * bodies[j].m * invDist3;
