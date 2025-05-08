@@ -1,23 +1,26 @@
-# CPU implementation sources
-set(CPU_SOURCES
+set(CPU_EXE_SRCS
     cpu-core.cpp
+    cpu-main.cpp
 )
 
 # Create CPU executable
-add_executable(cpu_nbody ${CPU_SOURCES})
-target_link_libraries(cpu_nbody PRIVATE 
-    nbody_common
-    Threads::Threads 
-    m
-)
+add_executable(cpu_nbody ${CPU_EXE_SRCS})
+
+# Create shared library for the core components (for unit tests)
+add_library(cpu_nbody_core STATIC cpu-core.cpp)
+
+set(CPU_LIBS nbody_common Threads::Threads)
+
+target_link_libraries(cpu_nbody PRIVATE ${CPU_LIBS})
+target_link_libraries(cpu_nbody_core PRIVATE ${CPU_LIBS})
 
 if(ENABLE_CILK)
-  target_compile_options(cpu_nbody PRIVATE -fopencilk -v)
+  target_compile_definitions(cpu_nbody PRIVATE ENABLE_CILK)
+  target_compile_definitions(cpu_nbody_core PRIVATE ENABLE_CILK)
+  
+  target_compile_options(cpu_nbody PRIVATE -fopencilk)
+  target_compile_options(cpu_nbody_core PRIVATE -fopencilk)
+  
+  target_link_options(cpu_nbody PRIVATE -fopencilk) 
+  target_link_options(cpu_nbody_core PRIVATE -fopencilk) 
 endif()
-
-# Create shared library for the core components (for tests to use)
-add_library(cpu_nbody_core STATIC
-    cpu-core.cpp
-)
-target_link_libraries(cpu_nbody_core PRIVATE nbody_common m)
-

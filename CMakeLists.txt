@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 
+
+option(ENABLE_CILK "Enable Cilk based parallelization" ON)
 # Check for OpenCilk (clang with cilk support)
 if(ENABLE_CILK)
     if(DEFINED ENV{CILK_CLANG})
@@ -62,7 +64,6 @@ endif()
 
 # Options
 option(BUILD_TESTING "Build tests" ON)
-option(ENABLE_CILK "Enable Cilk based parallelization" ON)
 
 # Add Google Test
 include(FetchContent)
@@ -75,9 +76,10 @@ FetchContent_Declare(
 # Include directories
 include_directories(${CMAKE_SOURCE_DIR}/common)
 
-# Add subdirectories
+# Add sources
 add_subdirectory(common)
 add_subdirectory(cpp)
+
 if(CUDAToolkit_FOUND AND DEFINED ENV{ENABLE_CUDA})
   add_subdirectory(cuda)
 endif()
