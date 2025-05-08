@@ -1,3 +1,6 @@
+#ifndef MAIN_H
+#define MAIN_H
+
 #include "octree.h"
 #include "philox_engine.h"
 
@@ -27,3 +30,5 @@ int MACInteractionsDFT(Body *bodies, float dt, int nBodies,
 int allInteractionsDFT(Body *bodies, float dt, int nBodies,
                        std::vector<DFTNode> &dft);
 int libMain(const int argc, const char **argv);
+
+#endif
