@@ -18,7 +18,7 @@ df['Workers'] = df['Workers'].astype(int)
 # === Plot Config ===
 metrics = ['Runtime(s)', 'IPC', 'CacheMisses', 'BackendStalls']
 ylabels = ['Runtime (s)', 'IPC', 'Cache Misses', 'Backend Stalls']
-xticks = [1, 2, 4, 8, 16, 32, 64, 128]
+xticks = [1, 2, 4, 8, 16, 32, 64, 128, 256]
 
 # === Plot each metric ===
 for metric, ylabel in zip(metrics, ylabels):

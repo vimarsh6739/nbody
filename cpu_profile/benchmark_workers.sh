@@ -10,7 +10,7 @@ FLAMEGRAPH_DIR=FlameGraph
 OUTPUT_CSV="$SCRIPT_DIR/benchmark_results.csv"
 PLOT_SCRIPT="$SCRIPT_DIR/plot_benchmarks.py"
 BODY_COUNT=10000
-WORKERS=(1 2 4 8 16 32 64 128)
+WORKERS=(1 2 4 8 16 32 64 128 256)
 
 # === Build ===
 echo "[+] Building project..."
@@ -34,12 +34,12 @@ for W in "${WORKERS[@]}"; do
     # Remove temp files before run
     rm -f perf.data perf_script.data "$N_OUT" "$P_STAT"
 
-    # === Run the simulation and collect perf record ===
-    CILK_NWORKERS=$W perf record -e cpu-cycles,instructions -c 3333333 -g -- ./$EXECUTABLE -n $BODY_COUNT > "$N_OUT" 2>&1 || continue
+    # === Run simulation silently ===
+    CILK_NWORKERS=$W perf record -e cpu-cycles,instructions -c 3333333 -g -- ./$EXECUTABLE -n $BODY_COUNT > "$N_OUT" 2>/dev/null || continue
 
-    # === Collect performance stats ===
+    # === Collect performance stats silently ===
     CILK_NWORKERS=$W perf stat -e cpu-cycles,instructions,cache-misses,cpu/event=0xa3,umask=0x01,name=RESOURCE_STALLS.ANY/ -r 1 \
-        ./$EXECUTABLE -n $BODY_COUNT 2> "$P_STAT"
+        ./$EXECUTABLE -n $BODY_COUNT 1>/dev/null 2> "$P_STAT"
 
     # === Extract values ===
     RUNTIME=$(grep "Total time" "$N_OUT" | awk '{print $4}')
