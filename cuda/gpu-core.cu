@@ -10,6 +10,9 @@
 #include <string>
 
 #include <random>
+#include <cuda.h>
+#include <cuda_runtime.h>
+
 
 float SOFTENING = 1e-9f;
 bool USE_TREE = false; // use tree or list
