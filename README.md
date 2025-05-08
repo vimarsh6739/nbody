@@ -5,7 +5,12 @@ N body simulations implemented as a project for CS533 : Parallel Computer Archit
 ## Build and run
 
 ### Generate flamegraph
-`./generate_flamegraph.sh <number of workers>`
+1. `cd cpu_profile`
+2. `./generate_flamegraph.sh <number of workers> -n <number of bodies>`
+
+### Generate data of different workers
+1. `cd cpu_profile`
+2. `./benchmark_workers.sh`
 
 ### Basic cpp implementation
 1. `mkdir build`
