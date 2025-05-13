@@ -71,7 +71,7 @@ __global__ void MACKernel(Body *bodies, Body *newBodies, float dt,
 }
 
 // CUDA kernel
-__global__ void DSKernel(Body *bodies, Body *newBodies, float dt,
+__global__ void DSKernel(Body *bodies, float dt,
                          int n /*nbodies*/, float SOFTENING) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < n) {
@@ -95,9 +95,9 @@ __global__ void DSKernel(Body *bodies, Body *newBodies, float dt,
     }
 
     // update velocity
-    newBodies[idx].vx += (double)dt * Fx;
-    newBodies[idx].vy += (double)dt * Fy;
-    newBodies[idx].vz += (double)dt * Fz;
+    bodies[idx].vx += (double)dt * Fx;
+    bodies[idx].vy += (double)dt * Fy;
+    bodies[idx].vz += (double)dt * Fz;
   }
 }
 
@@ -145,19 +145,16 @@ int launchDS(Body *bodies, float dt, int N /*nbodies*/) {
 
   // Device vectors
   Body *d_bodies;
-  Body *d_newBodies;
 
   checkCuda(cudaMalloc(&d_bodies, size), "Allocating d_bodies");
-  checkCuda(cudaMalloc(&d_newBodies, size), "Allocating d_newBodies");
   checkCuda(cudaMemcpy(d_bodies, bodies, size, cudaMemcpyHostToDevice),
             "Copying bodies to d_bodies");
-  checkCuda(cudaMemcpy(d_newBodies, d_bodies, size, cudaMemcpyDeviceToDevice),
-            "D2D copy of bodies");
+
 
   // Launch kernel (1D grid of 256 threads per block)
   int threadsPerBlock = 256;
   int blocksPerGrid = (N + threadsPerBlock - 1) / threadsPerBlock;
-  DSKernel<<<blocksPerGrid, threadsPerBlock>>>(d_bodies, d_newBodies, dt, N,
+  DSKernel<<<blocksPerGrid, threadsPerBlock>>>(d_bodies, dt, N,
                                                SOFTENING);
 
   // Check for kernel launch errors
