@@ -3,12 +3,11 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
-#include <filesystem>
 #include <string>
 
 /* Morton Representation */
 
-Key getKey(Body body, int resolution) {
+Key computeMortonKey(Body body, int resolution) {
   Key key = 0;
 
   float x = body.x, y = body.y, z = body.z;
@@ -112,26 +111,23 @@ void Octree::updateAggregateStats(Node *&node, Body &body) {
 int Octree::subdivide(Node *&node, int level) {
   int subidx = this->getOctantIndex(node->key, level + 1);
   node->children[subidx] = new Node(node->key); // push down leaf
-  node->maskChildren |= (1 << subidx);                // update mask
-  node->key -= (1LL << (3 * resolution));             // mark as internal node
+  node->maskChildren |= (1 << subidx);          // update mask
+  node->key -= (1LL << (3 * resolution));       // mark as internal node
   return subidx;
 }
 
-int Octree::insert(Body &body) {
-
+void Octree::insert(Body &body) {
   if (isEmpty(root)) {
     root = new Node(body.key);
-    return 1;
+    return;
   }
 
-  int addedLeaf = 0;
   Node *ptr = root;
   for (int level = 0; level < resolution; ++level) {
     if (isEmpty(ptr)) {
       // alloc and mark as leaf
       ptr = new Node(body.key);
       updateAggregateStats(ptr, body);
-      addedLeaf = 1;
       break;
     } else if (isLeaf(ptr)) {
       if (level < resolution - 1) {
@@ -149,8 +145,6 @@ int Octree::insert(Body &body) {
       ptr = ptr->children[next];
     }
   }
-
-  return addedLeaf;
 }
 
 void Octree::printTree(Node *&node, int level) {

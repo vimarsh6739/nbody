@@ -13,7 +13,7 @@ typedef struct {
   int index; // index of the body in the bodies array
 } Body;
 
-Key getKey(Body b, int resolution);
+Key computeMortonKey(Body b, int resolution);
 int binaryLength(Key n);
 
 template <typename T> std::string binaryString(T val) {
@@ -34,7 +34,7 @@ public:
   uint8_t maskChildren;
   std::vector<int> bodyIdx; // indeces into the bodies array
   uint64_t subTreeSize;     // used to build autoropes
-  int nLeaves;              // number of leaves in the subtree
+
   float cx, cy, cz;         // centroid pos
   float tm;                 // total mass
 
@@ -68,7 +68,7 @@ public:
   int getOctantIndex(Key key, int level);
   void updateAggregateStats(Node *&node, Body &body);
   int subdivide(Node *&node, int level);
-  int insert(Body &body);
+  void insert(Body &body);
   void printTree(Node *&node, int level);
   void buildDFT(std::vector<DFTNode> &nodes, Body *bodies);
   void traverse(Node *node, std::vector<DFTNode> &nodes);

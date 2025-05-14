@@ -199,16 +199,15 @@ void reconstructOctree(Octree *&octree, std::vector<DFTNode> &dft,
 
   // regenerate keys for new positions
   for (int i = 0; i < nBodies; ++i) {
-    particles[i].key = getKey(particles[i], AXIS_RESOLUTION);
+    particles[i].key = computeMortonKey(particles[i], AXIS_RESOLUTION);
   }
 
   // free old octree, create new octree (will optimize later)
   delete octree;
   octree = new Octree(AXIS_RESOLUTION);
 
-  int nUniqueLeaves = 0;
   for (int i = 0; i < nBodies; i++) {
-    nUniqueLeaves += octree->insert(particles[i]);
+    octree->insert(particles[i]);
   }
   octree->buildDFT(dft, particles);
 
@@ -216,7 +215,6 @@ void reconstructOctree(Octree *&octree, std::vector<DFTNode> &dft,
   //        nUniqueLeaves);
   // octree->printTree(octree->root, 0);
   // octree->printTree(octree->root, 0);
-  assert(octree->root->nLeaves == nBodies);
 }
 
 // Randomize the positions and velocities in the range [-1, 1],
@@ -233,7 +231,7 @@ void randomizeBodies(PhiloxEngine &rng, Body *bodies, int n) {
 
     body.index = i;
     // set the key for the current body
-    body.key = getKey(body, AXIS_RESOLUTION);
+    body.key = computeMortonKey(body, AXIS_RESOLUTION);
 
     body.vx = (v_dis(rng)) * 2 - 1;
     body.vy = (v_dis(rng)) * 2 - 1;
@@ -359,6 +357,7 @@ int libMain(const int argc, const char **argv) {
   if (result.count("error")) {
     errorCheck = true;
   }
+
   printf("Error check: %s\n", errorCheck ? "true" : "false");
 
   // parse options
