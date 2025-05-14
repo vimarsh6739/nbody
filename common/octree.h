@@ -30,8 +30,6 @@ template <typename T> std::string binaryString(T val) {
 class Node {
 public:
   Key key;
-  bool isLeaf;
-  Node *parent;
   Node *children[8];
   uint8_t maskChildren;
   std::vector<int> bodyIdx; // indeces into the bodies array
@@ -39,7 +37,6 @@ public:
   int nLeaves;              // number of leaves in the subtree
   float cx, cy, cz;         // centroid pos
   float tm;                 // total mass
-  int nBodies;
 
   Node(Key key, bool isLeaf);
   ~Node();
@@ -75,7 +72,6 @@ public:
   void printTree(Node *&node, int level);
   void buildDFT(std::vector<DFTNode> &nodes, Body *bodies);
   void traverse(Node *node, std::vector<DFTNode> &nodes);
-  void splitNode(Node *current, int index, int nLevels, int level);
 };
 
 #endif // OCTREE_H

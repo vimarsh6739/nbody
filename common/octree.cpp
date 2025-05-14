@@ -195,14 +195,13 @@ void Octree::traverse(Node *node, std::vector<DFTNode> &nodes) {
 
   DFTNode dftNode;
   dftNode.key = node->key;
-  dftNode.isLeaf = node->isLeaf;
+  dftNode.isLeaf = isLeaf(node);
   dftNode.index = nodes.size();
 
   dftNode.x = node->cx;
   dftNode.y = node->cy;
   dftNode.z = node->cz;
   dftNode.mass = node->tm;
-  dftNode.nBodies = node->nBodies;
 
   dftNode.autorope =
       dftNode.index +
@@ -212,7 +211,7 @@ void Octree::traverse(Node *node, std::vector<DFTNode> &nodes) {
 
   nodes.push_back(dftNode);
 
-  if (!node->isLeaf) {
+  if (!isLeaf(node)) {
     for (int i = 0; i < 8; i++) {
       if (node->maskChildren & (1 << i))
         traverse(node->children[i], nodes);
