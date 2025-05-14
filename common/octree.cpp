@@ -150,6 +150,8 @@ void Octree::subdivide(Node *&node, int level) {
   node->children[subidx] = new Node(node->key); // push down leaf
   node->maskChildren |= (1 << subidx);          // update mask
   node->key -= (1LL << (3 * resolution));       // mark as internal node
+  node->children[subidx]->bodyIdx = node->bodyIdx; // copy leaf indices to new leaf
+  node->bodyIdx.clear(); // clear bodyIdx of old leaf
 }
 
 void Octree::insert(Body &body) {
@@ -165,6 +167,7 @@ void Octree::insert(Body &body) {
     if (isEmpty(ptr_next)) {
       // insert a leaf and leave
       ptr->children[dest] = new Node(body.key);
+      ptr->maskChildren |= (1 << dest);
       ptr_next = ptr->children[dest];
       ptr_next->bodyIdx.push_back(body.index);
       updateAggregateStats(ptr_next, body);

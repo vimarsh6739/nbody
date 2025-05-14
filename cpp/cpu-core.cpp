@@ -23,25 +23,42 @@ float THETA = .5; // MAC parameter
 
 int AXIS_RESOLUTION = 16;
 int MAX_KEY_LENGTH = sizeof(Key) * 8;
-
-void BarnesHutDFS(Octree *&tree, Node *&node, Body &particle, float &Fx,
+int bh_ctr = 0;
+int ds_ctr = 0;
+void BarnesHutDFS(Octree *&tree, Node *&node, Body *&particles, int tid, float &Fx,
                   float &Fy, float &Fz, int level) {
   if (tree->isEmpty(node))
     return;
-
+  // printf("level: %d, tid: %d\n", level, tid);
   // compute approx forces
-  float dx = node->cx - particle.x;
-  float dy = node->cy - particle.y;
-  float dz = node->cz - particle.z;
+  float dx = node->cx - particles[tid].x;
+  float dy = node->cy - particles[tid].y;
+  float dz = node->cz - particles[tid].z;
   float dstSq = dx * dx + dy * dy + dz * dz + SOFTENING;
   float invDist = 1.0f / sqrtf(dstSq);
 
   float octantSize = 1.0f / (1 << level);
   float MAC = octantSize * invDist;
 
-  // multipole acceptance criterion
-  if (tree->isLeaf(node) || (USE_BH && (MAC < THETA))) {
-    if (node->key != particle.key) {
+  if(tree->isLeaf(node)) {
+    for(int idx: node->bodyIdx){
+      
+      if(idx==tid) continue;
+      float dx =  particles[idx].x - particles[tid].x;
+      float dy =  particles[idx].y - particles[tid].y;
+      float dz =  particles[idx].z - particles[tid].z;
+      float dstSq = dx * dx + dy * dy + dz * dz + SOFTENING;
+      float invDist = 1.0f / sqrtf(dstSq);
+      float invDist3 = invDist * invDist * invDist;
+      
+      Fx += dx * particles[idx].m * invDist3;
+      Fy += dy * particles[idx].m * invDist3;
+      Fz += dz * particles[idx].m * invDist3;
+      bh_ctr++;
+    }
+  } else if (USE_BH && (MAC < THETA)) {
+    // multipole acceptance criterion
+    if (node->key != particles[tid].key) {
       float invDist3 = invDist * invDist * invDist;
       Fx += dx * node->tm * invDist3;
       Fy += dy * node->tm * invDist3;
@@ -51,7 +68,8 @@ void BarnesHutDFS(Octree *&tree, Node *&node, Body &particle, float &Fx,
     for (int i = 0; i < 8; ++i) {
       // sparse DFS is possible here
       if (node->maskChildren & (1 << i)) {
-        BarnesHutDFS(tree, node->children[i], particle, Fx, Fy, Fz, (level + 1));
+        BarnesHutDFS(tree, node->children[i], particles, tid, Fx, Fy, Fz,
+                    (level + 1));
       }
     }
   }
@@ -63,7 +81,7 @@ void BarnesHutInteractions(Octree *&tree, Body *&particles, float dt,
     float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
 
     // perform a truncated DFS to compute Fx,Fy,Fz
-    BarnesHutDFS(tree, tree->root, particles[i], Fx, Fy, Fz, 0);
+    BarnesHutDFS(tree, tree->root, particles, i, Fx, Fy, Fz, 0);
 
     // update momentum
     particles[i].vx += Fx * dt;
@@ -72,52 +90,7 @@ void BarnesHutInteractions(Octree *&tree, Body *&particles, float dt,
   }
 }
 
-/* int allInteractionsDFT(Body *bodies, float dt, int nBodies,
-                       std::vector<DFTNode> &dft) {
-  int nInteractions = 0;
-
-  std::vector<float> new_vx(nBodies), new_vy(nBodies), new_vz(nBodies);
-
-  for (int target = 0; target < nBodies; target++) {
-    float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
-
-    for (uint j = 0; j < dft.size(); j++) {
-      if (dft[j].isLeaf) {
-        for (int bIndex : dft[j].bodies) {
-          if (bIndex == target)
-            continue;
-          nInteractions++;
-          float dx = bodies[bIndex].x - bodies[target].x;
-          float dy = bodies[bIndex].y - bodies[target].y;
-          float dz = bodies[bIndex].z - bodies[target].z;
-          float distSqr = dx * dx + dy * dy + dz * dz + SOFTENING;
-          float invDist = 1.0f / sqrtf(distSqr);
-          float invDist3 = invDist * invDist * invDist;
-
-          Fx += dx * bodies[bIndex].m * invDist3;
-          Fy += dy * bodies[bIndex].m * invDist3;
-          Fz += dz * bodies[bIndex].m * invDist3;
-        }
-      }
-    }
-
-    new_vx[target] = bodies[target].vx + dt * Fx;
-    new_vy[target] = bodies[target].vy + dt * Fy;
-    new_vz[target] = bodies[target].vz + dt * Fz;
-  }
-
-  for (int i = 0; i < nBodies; i++) {
-    bodies[i].vx = new_vx[i];
-    bodies[i].vy = new_vy[i];
-    bodies[i].vz = new_vz[i];
-  }
-
-  return nInteractions;
-} */
-
 void allInteractionsDS(Body *bodies, float dt, int nBodies) {
-  std::vector<float> new_vx(nBodies), new_vy(nBodies), new_vz(nBodies);
-
   for (int i = 0; i < nBodies; ++i) {
     float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
 
@@ -135,79 +108,14 @@ void allInteractionsDS(Body *bodies, float dt, int nBodies) {
       Fx += dx * bodies[j].m * invDist3;
       Fy += dy * bodies[j].m * invDist3;
       Fz += dz * bodies[j].m * invDist3;
+      ds_ctr++;
     }
 
-    new_vx[i] = bodies[i].vx + dt * Fx;
-    new_vy[i] = bodies[i].vy + dt * Fy;
-    new_vz[i] = bodies[i].vz + dt * Fz;
-  }
-
-  for (int i = 0; i < nBodies; i++) {
-    bodies[i].vx = new_vx[i];
-    bodies[i].vy = new_vy[i];
-    bodies[i].vz = new_vz[i];
+    bodies[i].vx += dt * Fx;
+    bodies[i].vy += dt * Fy;
+    bodies[i].vz += dt * Fz;
   }
 }
-
-/* int MACInteractionsDFT(Body *bodies, float dt, int nBodies,
-                       std::vector<DFTNode> &dft) {
-  int nInteractions = 0;
-
-  std::vector<float> new_vx(nBodies), new_vy(nBodies), new_vz(nBodies);
-
-  cilk_for(int target = 0; target < nBodies; target++) {
-    float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
-
-    for (size_t j = 0; j < dft.size(); j++) {
-      if (dft[j].isLeaf) {
-        for (int bIndex : dft[j].bodies) {
-          if (bIndex == target)
-            continue;
-          float dx = bodies[bIndex].x - bodies[target].x;
-          float dy = bodies[bIndex].y - bodies[target].y;
-          float dz = bodies[bIndex].z - bodies[target].z;
-          float distSqr = dx * dx + dy * dy + dz * dz + SOFTENING;
-          float invDist = 1.0f / sqrtf(distSqr);
-          float invDist3 = invDist * invDist * invDist;
-
-          Fx += dx * bodies[bIndex].m * invDist3;
-          Fy += dy * bodies[bIndex].m * invDist3;
-          Fz += dz * bodies[bIndex].m * invDist3;
-        }
-      } else if (MAC(bodies[target].x, bodies[target].y, bodies[target].z,
-                     dft[j].x, dft[j].y, dft[j].z, dft[j].mass)) {
-        float dx = dft[j].x - bodies[target].x;
-        float dy = dft[j].y - bodies[target].y;
-        float dz = dft[j].z - bodies[target].z;
-        float distSqr = dx * dx + dy * dy + dz * dz + SOFTENING;
-        float invDist = 1.0f / sqrtf(distSqr);
-        float invDist3 = invDist * invDist * invDist;
-
-        Fx += dx * dft[j].mass * invDist3;
-        Fy += dy * dft[j].mass * invDist3;
-        Fz += dz * dft[j].mass * invDist3;
-
-        if (dft[j].autorope < dft.size()) {
-          j = dft[j].autorope - 1;
-        } else {
-          break;
-        }
-      }
-    }
-
-    new_vx[target] = bodies[target].vx + dt * Fx;
-    new_vy[target] = bodies[target].vy + dt * Fy;
-    new_vz[target] = bodies[target].vz + dt * Fz;
-  }
-
-  for (int i = 0; i < nBodies; i++) {
-    bodies[i].vx = new_vx[i];
-    bodies[i].vy = new_vy[i];
-    bodies[i].vz = new_vz[i];
-  }
-
-  return nInteractions;
-} */
 
 void reconstructOctree(Octree *&tree, Body *particles, int nBodies) {
   for (int i = 0; i < nBodies; ++i) {
@@ -239,12 +147,12 @@ void wrap(float &pos, float &vel, float minv, float maxv) {
 
 void integratePositions(Body *&p, float dt, int start, int end) {
   for (int i = start; i < end; i++) {
-    wrap(p[i].x, p[i].vx);
-    wrap(p[i].y, p[i].vy);
-    wrap(p[i].z, p[i].vz);
     p[i].x += (p[i].vx * dt);
     p[i].y += (p[i].vy * dt);
     p[i].z += (p[i].vz * dt);
+    wrap(p[i].x, p[i].vx);
+    wrap(p[i].y, p[i].vy);
+    wrap(p[i].z, p[i].vz);
   }
 }
 
@@ -332,7 +240,7 @@ float computeRmsError(Body *p, Body *orig, int nBodies, int nIters, float dt) {
 
   USE_TREE = false;
   USE_BH = false;
-  PRINT_TIME = false;
+  PRINT_TIME = true;
   nbodyIterate(orig, dt, nBodies, nIters);
   PRINT_TIME = true;
 
@@ -347,6 +255,8 @@ float computeRmsError(Body *p, Body *orig, int nBodies, int nIters, float dt) {
 
   rmsError = std::sqrt((rmsError / nBodies));
 
+  printf("DS interactions: %d\n", ds_ctr);
+  printf("BH interactions: %d\n", bh_ctr);
   return rmsError;
 }
 

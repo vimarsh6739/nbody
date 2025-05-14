@@ -97,13 +97,14 @@ void allInteractionsDS(Body *bodies, float dt, int nBodies);
  *
  * @param tree
  * @param node
- * @param particle
+ * @param particles
+ * @param tid
  * @param Fx
  * @param Fy
  * @param Fz
  * @param level
  */
-void BarnesHutDFS(Octree *&tree, Node *&node, Body &particle, float &Fx,
+void BarnesHutDFS(Octree *&tree, Node *&node, Body *&particles, int tid, float &Fx,
                   float &Fy, float &Fz, int level);
 /**
  * @brief Compute forces using truncated Barnes-Hut computations
