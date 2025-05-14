@@ -9,7 +9,7 @@ TEST(OctreeTest, GetKey) {
   Body body = {0.5f, 0.25f, 0.125f, 0.0f, 0.0f, 0.0f, 1.0f, 0, 0};
 
   // Get key
-  Key key = getKey(body, 4);
+  Key key = computeMortonKey(body, 4);
 
   // Since the function interleaves bits from x, y, z, we can test
   // specific properties of the resulting key
@@ -17,13 +17,13 @@ TEST(OctreeTest, GetKey) {
 
   // Create another test case with different values
   Body body2 = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0, 0};
-  Key key2 = getKey(body2, 20);
+  Key key2 = computeMortonKey(body2, 20);
   ASSERT_EQ(key2, 1LL << 60);
 
   // Test with coordinates at the max (1.0): this actually should overflow our
   // resolution of 15 bits (since 1 << 15 actually has 16 bits)
   Body body3 = {1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0, 0};
-  Key key3 = getKey(body3, 15);
+  Key key3 = computeMortonKey(body3, 15);
 
   Key expectedKey3 = (7LL << (Key)(15 * 3)) + (1LL << (45));
   ASSERT_EQ(key3,
@@ -107,18 +107,17 @@ TEST(OctreeTest, OctreeInsert) {
   Body body = {0.5f, 0.25f, 0.125f, 0.0f, 0.0f, 0.0f, 1.0f, 0, 0};
 
   // For testing, we need to set a valid key (with 1 prepended)
-  Key baseKey = getKey(body, 16);
+  Key baseKey = computeMortonKey(body, 16);
   printf("KEY: %lu, KEY LENGTH: %d\n", baseKey, binaryLength(baseKey));
   body.key = baseKey;
 
   // Insert the body and check the result
-  int result = octree.insert(body);
-  ASSERT_EQ(result, 1); // Should return 1 for successful insertion
+  octree.insert(body);
   
   // Insert the same body again to test handling of duplicates
-  int resultDup = octree.insert(body);
+  octree.insert(body);
 
-  ASSERT_EQ(resultDup, 0); // Should return 0 for duplicate
+  ASSERT_EQ(octree.root->subTreeSize, 2); 
 }
 
 // Test DFT error

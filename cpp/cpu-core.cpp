@@ -1,20 +1,17 @@
 #include "octree.h"
 #include <assert.h>
+#include <cilk/cilk.h>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <ctimer.h>
 #include <cxxopts.hpp>
+#include <ios>
 #include <iostream>
 #include <main.h>
 #include <new>
 #include <random>
 #include <string>
-
-#ifdef ENABLE_CILK
-#include <cilk/cilk.h>
-#endif
-#include <random>
 
 float SOFTENING = 1e-9f;
 
@@ -43,11 +40,7 @@ int allInteractionsDFT(Body *bodies, float dt, int nBodies,
 
   std::vector<float> new_vx(nBodies), new_vy(nBodies), new_vz(nBodies);
 
-#ifdef ENABLE_CILK
   cilk_for(int target = 0; target < nBodies; target++) {
-#else
-  for (int target = 0; target < nBodies; target++) {
-#endif
     float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
 
     for (uint j = 0; j < dft.size(); j++) {
@@ -55,9 +48,7 @@ int allInteractionsDFT(Body *bodies, float dt, int nBodies,
         for (int bIndex : dft[j].bodies) {
           if (bIndex == target)
             continue;
-#ifndef ENABLE_CILK
           nInteractions++;
-#endif
           float dx = bodies[bIndex].x - bodies[target].x;
           float dy = bodies[bIndex].y - bodies[target].y;
           float dz = bodies[bIndex].z - bodies[target].z;
@@ -89,11 +80,7 @@ int allInteractionsDFT(Body *bodies, float dt, int nBodies,
 void allInteractionsDS(Body *bodies, float dt, int nBodies) {
   std::vector<float> new_vx(nBodies), new_vy(nBodies), new_vz(nBodies);
 
-#ifdef ENABLE_CILK
   cilk_for(int i = 0; i < nBodies; ++i) {
-#else
-  for (int i = 0; i < nBodies; ++i) {
-#endif
     float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
 
     for (int j = 0; j < nBodies; ++j) {
@@ -124,6 +111,16 @@ void allInteractionsDS(Body *bodies, float dt, int nBodies) {
   }
 }
 
+void DFSInteractions(const Octree *&octree, Body *&particles, flat dt, int nbodies){
+  
+}
+
+void BarnesHuttInteractions(Octree *&octree, Body *&particles, float dt,
+                            int nbodies) {
+  for(int i=0;i<nbodies;++i){
+    // perform DFS
+  }
+}
 int MACInteractionsDFT(Body *bodies, float dt, int nBodies,
                        std::vector<DFTNode> &dft) {
   int nInteractions = 0;
@@ -194,9 +191,7 @@ int MACInteractionsDFT(Body *bodies, float dt, int nBodies,
   return nInteractions;
 }
 
-void reconstructOctree(Octree *&octree, std::vector<DFTNode> &dft,
-                       Body *particles, int nBodies) {
-
+void reconstructOctree(Octree *&octree, Body *particles, int nBodies) {
   // regenerate keys for new positions
   for (int i = 0; i < nBodies; ++i) {
     particles[i].key = computeMortonKey(particles[i], AXIS_RESOLUTION);
@@ -209,12 +204,8 @@ void reconstructOctree(Octree *&octree, std::vector<DFTNode> &dft,
   for (int i = 0; i < nBodies; i++) {
     octree->insert(particles[i]);
   }
-  octree->buildDFT(dft, particles);
-
-  // printf("Octree built with %d buckets (leaves with unique key)\n",
-  //        nUniqueLeaves);
-  // octree->printTree(octree->root, 0);
-  // octree->printTree(octree->root, 0);
+  
+  octree->finalizeStats(octree->root);
 }
 
 // Randomize the positions and velocities in the range [-1, 1],
@@ -272,13 +263,12 @@ void integratePositions(Body *p, float dt, int start, int end) {
   }
 }
 
-double nbodyIterate(Body *p, float dt, int nBodies, int nIters) {
+double nbodyIterate(Body *particles, float dt, int nBodies, int nIters) {
 
   // begin benchmark
   ctimer_t timer;
   ctimer_start(&timer);
 
-  std::vector<DFTNode> dft;
   Octree *octree = nullptr;
 
   if (USE_TREE) {
@@ -288,11 +278,11 @@ double nbodyIterate(Body *p, float dt, int nBodies, int nIters) {
   for (int iter = 1; iter <= nIters; iter++) {
 
     if (USE_TREE) {
-      reconstructOctree(octree, dft, p, nBodies);
+      reconstructOctree(octree, particles, nBodies);
     }
 
-    int nInteractions = bodyForce(p, dt, nBodies, dft);
-    integratePositions(p, dt, 0, nBodies);
+    bodyForce(particles, dt, nBodies);
+    integratePositions(particles, dt, 0, nBodies);
   }
 
   if (USE_TREE) {
@@ -311,14 +301,13 @@ double nbodyIterate(Body *p, float dt, int nBodies, int nIters) {
   return tElapsed;
 }
 
-int bodyForce(Body *p, float dt, int n, std::vector<DFTNode> dft) {
+void bodyForce(Body *p, float dt, int n) {
   if (USE_TREE && USE_BH)
-    return MACInteractionsDFT(p, dt, n, dft);
+    MACInteractionsDFT(p, dt, n);
   else if (USE_TREE)
-    return allInteractionsDFT(p, dt, n, dft);
+    allInteractionsDFT(p, dt, n);
   else {
     allInteractionsDS(p, dt, n);
-    return n * n;
   }
 }
 

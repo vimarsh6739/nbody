@@ -10,7 +10,7 @@ typedef uint64_t Key;
 typedef struct {
   float x, y, z, vx, vy, vz, m; // each body now has a mass 'm'
   Key key;
-  int index; // index of the body in the bodies array
+  int index; 
 } Body;
 
 Key computeMortonKey(Body b, int resolution);
@@ -67,6 +67,7 @@ public:
   bool isLeaf(Node *&n);
   int getOctantIndex(Key key, int level);
   void updateAggregateStats(Node *&node, Body &body);
+  void finalizeStats(Node*&node);
   int subdivide(Node *&node, int level);
   void insert(Body &body);
   void printTree(Node *&node, int level);

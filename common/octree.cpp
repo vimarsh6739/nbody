@@ -108,6 +108,22 @@ void Octree::updateAggregateStats(Node *&node, Body &body) {
     node->subTreeSize++;
 }
 
+void Octree::finalizeStats(Node *&node) {
+  if (isEmpty(node))
+    return;
+
+  node->cx /= node->tm;
+  node->cy /= node->tm;
+  node->cz /= node->tm;
+
+  // recurse
+  if (!isLeaf(node)) {
+    for (int i = 0; i < 8; ++i) {
+      finalizeStats(node->children[i]);
+    }
+  }
+}
+
 int Octree::subdivide(Node *&node, int level) {
   int subidx = this->getOctantIndex(node->key, level + 1);
   node->children[subidx] = new Node(node->key); // push down leaf
