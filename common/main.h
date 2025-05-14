@@ -53,6 +53,17 @@ float computeRmsError(Body *particles, Body *orig, int nBodies, int nIters,
                       float dt);
 
 /**
+ * @brief wrap points inside bounding box to ensure points dont get out of
+ * simulation bounds
+ *
+ * @param pos
+ * @param vel
+ * @param minv
+ * @param maxv
+ */
+void wrap(float &pos, float &vel, float minv = 0.01f, float maxv = 0.99f);
+
+/**
  * @brief Compute new positions after applying induced momentum
  *
  * @param p
@@ -60,7 +71,7 @@ float computeRmsError(Body *particles, Body *orig, int nBodies, int nIters,
  * @param start
  * @param end
  */
-void integratePositions(Body *particles, float dt, int start, int end);
+void integratePositions(Body *&particles, float dt, int start, int end);
 
 /**
  * @brief Compute forces using multiple methods

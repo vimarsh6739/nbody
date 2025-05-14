@@ -26,6 +26,8 @@ Key computeMortonKey(Body body, int resolution) {
   }
 
   uint64_t pos = 0;
+  // printf("x=%.4f,y=%.4f,z=%.4f,xint=%ul,yint=%ul,zint=%ul,pos=%ul", x, y, z,
+  //        xint, yint, zint, pos);
   while (xint || yint || zint) {
     // construct using LSB
     key |= (xint & 1) << pos;
@@ -40,6 +42,7 @@ Key computeMortonKey(Body body, int resolution) {
   }
 
   // assert no key overflow
+  // printf("value of pos = %ull\n", pos);
   assert((pos + 1) <= sizeof(Key) * 8);
 
   // actual key size = `(3*shift_digits+1)` bits
@@ -136,7 +139,7 @@ void Octree::finalizeStats(Node *&node, uint64_t &subTreeSize) {
     }
     subTreeSize += 1;
     node->subTreeSize = subTreeSize;
-    
+
   } else {
     subTreeSize = 1;
   }

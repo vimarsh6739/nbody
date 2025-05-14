@@ -237,8 +237,21 @@ void reconstructOctree(Octree *&tree, Body *particles, int nBodies) {
   // tree->printTree(tree->root, 0);
 }
 
-void integratePositions(Body *p, float dt, int start, int end) {
+void wrap(float &pos, float &vel, float minv, float maxv) {
+  if (pos <= minv) {
+    pos = minv;
+    vel = fabsf(vel);
+  } else if (pos >= maxv) {
+    pos = maxv;
+    vel = -fabsf(vel);
+  }
+}
+
+void integratePositions(Body *&p, float dt, int start, int end) {
   for (int i = start; i < end; i++) {
+    wrap(p[i].x, p[i].vx);
+    wrap(p[i].y, p[i].vy);
+    wrap(p[i].z, p[i].vz);
     p[i].x += (p[i].vx * dt);
     p[i].y += (p[i].vy * dt);
     p[i].z += (p[i].vz * dt);
