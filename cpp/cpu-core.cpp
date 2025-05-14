@@ -24,17 +24,6 @@ float THETA = .5; // MAC parameter
 int AXIS_RESOLUTION = 16;
 int MAX_KEY_LENGTH = sizeof(Key) * 8;
 
-/* bool MAC(float target_x, float target_y, float target_z, float x, float y,
-         float z, float mass) {
-  float dx = target_x - x;
-  float dy = target_y - y;
-  float dz = target_z - z;
-  float distance = sqrtf(dx * dx + dy * dy + dz * dz);
-  float size = mass;
-
-  return size / distance < THETA;
-} */
-
 void BarnesHutDFS(Octree *&tree, Node *&node, Body &particle, float &Fx,
                   float &Fy, float &Fz, int level) {
   if (tree->isEmpty(node))
@@ -60,8 +49,9 @@ void BarnesHutDFS(Octree *&tree, Node *&node, Body &particle, float &Fx,
     }
   } else {
     for (int i = 0; i < 8; ++i) {
+      // sparse DFS is possible here
       if (node->maskChildren & (1 << i)) {
-        BarnesHutDFS(tree, node, particle, Fx, Fy, Fz, (level + 1));
+        BarnesHutDFS(tree, node->children[i], particle, Fx, Fy, Fz, (level + 1));
       }
     }
   }
