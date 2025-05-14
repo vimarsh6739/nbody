@@ -10,7 +10,7 @@ typedef uint64_t Key;
 typedef struct {
   float x, y, z, vx, vy, vz, m; // each body now has a mass 'm'
   Key key;
-  int index; 
+  int index;
 } Body;
 
 Key computeMortonKey(Body b, int resolution);
@@ -35,9 +35,9 @@ public:
   std::vector<int> bodyIdx; // indeces into the bodies array
   uint64_t subTreeSize;     // used to build autoropes
 
-  float cx, cy, cz;         // centroid pos
-  float tm;                 // total mass
-
+  float cx, cy, cz; // centroid pos
+  float tm;         // total mass
+  
   Node(Key key);
   ~Node();
 };
@@ -55,6 +55,11 @@ typedef struct {
   std::vector<int> bodies; // indeces into the bodies array
 } DFTNode;
 
+/**
+ * @class Octree
+ * @brief implements an optimized CPU octree
+ *
+ */
 class Octree {
 
 public:
@@ -63,12 +68,35 @@ public:
 
   Octree(int resolution);
   ~Octree();
+
+  /**
+   * @brief check if node is empty
+   *
+   * @param n
+   * @return
+   */
   bool isEmpty(Node *&n);
+
+  /**
+   * @brief check if the node is a leaf
+   *
+   * @param n
+   * @return
+   */
   bool isLeaf(Node *&n);
+
+  /**
+   * @brief get the local index for the octant at the given level
+   *
+   * @param key
+   * @param level
+   * @return
+   */
   int getOctantIndex(Key key, int level);
+
   void updateAggregateStats(Node *&node, Body &body);
-  void finalizeStats(Node*&node);
-  int subdivide(Node *&node, int level);
+  void finalizeStats(Node *&node, uint64_t &subTreeSize);
+  void subdivide(Node *&node, int level);
   void insert(Body &body);
   void printTree(Node *&node, int level);
   void buildDFT(std::vector<DFTNode> &nodes, Body *bodies);

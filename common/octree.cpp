@@ -1,6 +1,7 @@
 #include "octree.h"
 #include <cassert>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
@@ -63,7 +64,7 @@ Node::Node(Key key) {
   this->key = key;
   this->subTreeSize = 1;
   this->maskChildren = 0;
-
+  this->bodyIdx.resize(0);
   for (int i = 0; i < 8; ++i)
     this->children[i] = nullptr;
 }
@@ -77,7 +78,9 @@ Node::~Node() {
 
 /* Octree functions */
 
-Octree::Octree(int resolution) : resolution(resolution), root(nullptr) {}
+Octree::Octree(int resolution) : resolution(resolution) {
+  root = new Node(0ULL);
+}
 
 Octree::~Octree() {
   delete root;
@@ -92,8 +95,12 @@ bool Octree::isLeaf(Node *&node) {
 
 int Octree::getOctantIndex(Key key, int level) {
   // [LEAF_BIT] [level0 : 3] [level1 : 3] [level2 : 3] ... [level{r-1} : 3]
+  // printf("Querying octant for key %lu\n", key);
   Key shifted = key >> (3 * (resolution - 1 - level));
-  return ((int)shifted & 0x7);
+  int octant = (static_cast<int>(shifted) & 0x7);
+  // printf("Octant is %d, right shifted by %d\n", octant,
+  //        (3 * (resolution - 1 - level)));
+  return octant;
 }
 
 void Octree::updateAggregateStats(Node *&node, Body &body) {
@@ -104,61 +111,73 @@ void Octree::updateAggregateStats(Node *&node, Body &body) {
   node->tm += body.m;
 
   // update subTreeSize, handle duplicates
-  if (!isLeaf(node) || (node->bodyIdx.size() > 0))
+  if (!isLeaf(node) || (node->bodyIdx.size() > 1))
     node->subTreeSize++;
 }
 
-void Octree::finalizeStats(Node *&node) {
-  if (isEmpty(node))
+void Octree::finalizeStats(Node *&node, uint64_t &subTreeSize) {
+  if (isEmpty(node)) {
+    subTreeSize = 0;
     return;
+  }
 
   node->cx /= node->tm;
   node->cy /= node->tm;
   node->cz /= node->tm;
 
+  // update subtree size
+
   // recurse
   if (!isLeaf(node)) {
     for (int i = 0; i < 8; ++i) {
-      finalizeStats(node->children[i]);
+      uint64_t recTreeSize = 0;
+      finalizeStats(node->children[i], recTreeSize);
+      subTreeSize += recTreeSize;
     }
+    subTreeSize += 1;
+    node->subTreeSize = subTreeSize;
+    
+  } else {
+    subTreeSize = 1;
   }
 }
 
-int Octree::subdivide(Node *&node, int level) {
-  int subidx = this->getOctantIndex(node->key, level + 1);
+void Octree::subdivide(Node *&node, int level) {
+  int subidx = this->getOctantIndex(node->key, level);
   node->children[subidx] = new Node(node->key); // push down leaf
   node->maskChildren |= (1 << subidx);          // update mask
   node->key -= (1LL << (3 * resolution));       // mark as internal node
-  return subidx;
 }
 
 void Octree::insert(Body &body) {
-  if (isEmpty(root)) {
-    root = new Node(body.key);
-    return;
-  }
 
   Node *ptr = root;
+
   for (int level = 0; level < resolution; ++level) {
-    if (isEmpty(ptr)) {
-      // alloc and mark as leaf
-      ptr = new Node(body.key);
-      updateAggregateStats(ptr, body);
+    // update centroid for internal node
+    updateAggregateStats(ptr, body);
+    int dest = this->getOctantIndex(body.key, level);
+    Node *ptr_next = ptr->children[dest];
+
+    if (isEmpty(ptr_next)) {
+      // insert a leaf and leave
+      ptr->children[dest] = new Node(body.key);
+      ptr_next = ptr->children[dest];
+      ptr_next->bodyIdx.push_back(body.index);
+      updateAggregateStats(ptr_next, body);
       break;
-    } else if (isLeaf(ptr)) {
+    } else if (isLeaf(ptr_next)) {
       if (level < resolution - 1) {
-        int next = subdivide(ptr, level);
-        updateAggregateStats(ptr, body);
-        ptr = ptr->children[next];
+        // promote to internal node
+        subdivide(ptr_next, level + 1);
+        ptr = ptr_next;
       } else {
-        // duplicate key
-        ptr->bodyIdx.push_back(body.index);
-        updateAggregateStats(ptr, body);
+        // cant subdivide anymore, duplicate then exit.
+        ptr_next->bodyIdx.push_back(body.index);
+        updateAggregateStats(ptr_next, body);
       }
     } else {
-      updateAggregateStats(ptr, body);
-      int next = this->getOctantIndex(body.key, level + 1);
-      ptr = ptr->children[next];
+      ptr = ptr_next;
     }
   }
 }

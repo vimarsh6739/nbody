@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 
 #include "main.h"
+#include "octree.h"
 
 // Test getKeyfunction
 TEST(OctreeTest, GetKey) {
@@ -92,8 +93,7 @@ TEST(OctreeTest, OctreeConstructor) {
 
   // Check initial values
   ASSERT_EQ(octree.resolution, 7); // 21 / 3 = 7
-  ASSERT_EQ(octree.root, nullptr);
-  ASSERT_TRUE(octree.isEmpty(octree.root));
+  ASSERT_EQ(octree.root->key, 0ULL);
 }
 
 // Test Octree insertion
@@ -113,27 +113,34 @@ TEST(OctreeTest, OctreeInsert) {
 
   // Insert the body and check the result
   octree.insert(body);
-  
+
   // Insert the same body again to test handling of duplicates
   octree.insert(body);
 
-  ASSERT_EQ(octree.root->subTreeSize, 2); 
+  ASSERT_EQ(octree.root->subTreeSize, 3);
 }
 
 // Test DFT error
 TEST(OctreeTest, DFTError) {
-  GTEST_SKIP() << "Skipping end to end test";
-  Octree octree(16);
+  Octree octree(16); // 48 bit resolution for keys.
 
   // Create a test body with a properly formatted key
   // The key must have a 1 in the most significant bit (prepended)
   // which means bit position leafLength - 1 (20 in this case)
-  int nBodies = 100;
+  int nBodies = 1000;
   Body *particles = new Body[nBodies];
 
   // Initialize positions, velocities, and masses (7 values per body)
   PhiloxEngine rng(2025);
   randomizeBodies(rng, particles, nBodies);
+  // particles[2] = particles[0];
+  // particles[3] = particles[1];
+
+  // // print the keys
+  // for (int i = 0; i < nBodies; ++i) {
+  //   printf("Key %d: %lu == 0b%s\n", i, particles[i].key,
+  //          binaryString<Key>(particles[i].key).c_str());
+  // }
 
   // make a copy of bodies for accuracy check
   Body *particles_cp = new Body[nBodies];
@@ -141,10 +148,25 @@ TEST(OctreeTest, DFTError) {
     particles_cp[i] = particles[i];
   }
 
-  int nIters = 1;
-  float dt = 10;
-  nbodyIterate(particles, dt, nBodies, nIters);
-  float err = checkAccuracy(particles, particles_cp, nBodies, nIters);
+  // for (int i = 0; i < nBodies; ++i) {
+  //   printf("Copy Key %d: %lu\n", i, particles[i].key);
+  // }
 
-  ASSERT_LE(err, 1e-9); // Should return 0 for duplicate
+  int nIters = 10;
+  float dt = 0.0005;
+  USE_TREE = true;
+  USE_BH = false;
+  PRINT_TIME = true;
+  AXIS_RESOLUTION = 16;
+
+  nbodyIterate(particles, dt, nBodies, nIters);
+  float err = computeRmsError(particles, particles_cp, nBodies, nIters, dt);
+  printf("RMS error: %f\n", err);
+  printf("RMS error between direct summation and Barnes Hut(without "
+         "approximation) = %.6f\n",
+         err);
+
+  delete[] particles;
+  delete[] particles_cp;
+  ASSERT_LE(err, 1e-2); // Should return 0 for duplicate
 }

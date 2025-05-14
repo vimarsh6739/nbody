@@ -1,12 +1,13 @@
 #include "octree.h"
 #include <assert.h>
 #include <cilk/cilk.h>
+#include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <ctimer.h>
 #include <cxxopts.hpp>
-#include <ios>
 #include <iostream>
 #include <main.h>
 #include <new>
@@ -18,12 +19,12 @@ float SOFTENING = 1e-9f;
 bool USE_TREE = false; // use tree or list
 bool USE_BH = true;    // use barnes hut or not
 bool PRINT_TIME = true;
-float MAC_PARAM = .5; // MAC parameter
+float THETA = .5; // MAC parameter
 
 int AXIS_RESOLUTION = 16;
 int MAX_KEY_LENGTH = sizeof(Key) * 8;
 
-bool MAC(float target_x, float target_y, float target_z, float x, float y,
+/* bool MAC(float target_x, float target_y, float target_z, float x, float y,
          float z, float mass) {
   float dx = target_x - x;
   float dy = target_y - y;
@@ -31,16 +32,63 @@ bool MAC(float target_x, float target_y, float target_z, float x, float y,
   float distance = sqrtf(dx * dx + dy * dy + dz * dz);
   float size = mass;
 
-  return size / distance < MAC_PARAM;
+  return size / distance < THETA;
+} */
+
+void BarnesHutDFS(Octree *&tree, Node *&node, Body &particle, float &Fx,
+                  float &Fy, float &Fz, int level) {
+  if (tree->isEmpty(node))
+    return;
+
+  // compute approx forces
+  float dx = node->cx - particle.x;
+  float dy = node->cy - particle.y;
+  float dz = node->cz - particle.z;
+  float dstSq = dx * dx + dy * dy + dz * dz + SOFTENING;
+  float invDist = 1.0f / sqrtf(dstSq);
+
+  float octantSize = 1.0f / (1 << level);
+  float MAC = octantSize * invDist;
+
+  // multipole acceptance criterion
+  if (tree->isLeaf(node) || (USE_BH && (MAC < THETA))) {
+    if (node->key != particle.key) {
+      float invDist3 = invDist * invDist * invDist;
+      Fx += dx * node->tm * invDist3;
+      Fy += dy * node->tm * invDist3;
+      Fz += dz * node->tm * invDist3;
+    }
+  } else {
+    for (int i = 0; i < 8; ++i) {
+      if (node->maskChildren & (1 << i)) {
+        BarnesHutDFS(tree, node, particle, Fx, Fy, Fz, (level + 1));
+      }
+    }
+  }
 }
 
-int allInteractionsDFT(Body *bodies, float dt, int nBodies,
+void BarnesHutInteractions(Octree *&tree, Body *&particles, float dt,
+                           int nbodies) {
+  for (int i = 0; i < nbodies; ++i) {
+    float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
+
+    // perform a truncated DFS to compute Fx,Fy,Fz
+    BarnesHutDFS(tree, tree->root, particles[i], Fx, Fy, Fz, 0);
+
+    // update momentum
+    particles[i].vx += Fx * dt;
+    particles[i].vy += Fy * dt;
+    particles[i].vz += Fz * dt;
+  }
+}
+
+/* int allInteractionsDFT(Body *bodies, float dt, int nBodies,
                        std::vector<DFTNode> &dft) {
   int nInteractions = 0;
 
   std::vector<float> new_vx(nBodies), new_vy(nBodies), new_vz(nBodies);
 
-  cilk_for(int target = 0; target < nBodies; target++) {
+  for (int target = 0; target < nBodies; target++) {
     float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
 
     for (uint j = 0; j < dft.size(); j++) {
@@ -75,12 +123,12 @@ int allInteractionsDFT(Body *bodies, float dt, int nBodies,
   }
 
   return nInteractions;
-}
+} */
 
 void allInteractionsDS(Body *bodies, float dt, int nBodies) {
   std::vector<float> new_vx(nBodies), new_vy(nBodies), new_vz(nBodies);
 
-  cilk_for(int i = 0; i < nBodies; ++i) {
+  for (int i = 0; i < nBodies; ++i) {
     float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
 
     for (int j = 0; j < nBodies; ++j) {
@@ -111,27 +159,13 @@ void allInteractionsDS(Body *bodies, float dt, int nBodies) {
   }
 }
 
-void DFSInteractions(const Octree *&octree, Body *&particles, flat dt, int nbodies){
-  
-}
-
-void BarnesHuttInteractions(Octree *&octree, Body *&particles, float dt,
-                            int nbodies) {
-  for(int i=0;i<nbodies;++i){
-    // perform DFS
-  }
-}
-int MACInteractionsDFT(Body *bodies, float dt, int nBodies,
+/* int MACInteractionsDFT(Body *bodies, float dt, int nBodies,
                        std::vector<DFTNode> &dft) {
   int nInteractions = 0;
 
   std::vector<float> new_vx(nBodies), new_vy(nBodies), new_vz(nBodies);
 
-#ifdef ENABLE_CILK
   cilk_for(int target = 0; target < nBodies; target++) {
-#else
-  for (int target = 0; target < nBodies; target++) {
-#endif
     float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
 
     for (size_t j = 0; j < dft.size(); j++) {
@@ -139,9 +173,6 @@ int MACInteractionsDFT(Body *bodies, float dt, int nBodies,
         for (int bIndex : dft[j].bodies) {
           if (bIndex == target)
             continue;
-#ifndef ENABLE_CILK
-          nInteractions++;
-#endif
           float dx = bodies[bIndex].x - bodies[target].x;
           float dy = bodies[bIndex].y - bodies[target].y;
           float dz = bodies[bIndex].z - bodies[target].z;
@@ -155,9 +186,6 @@ int MACInteractionsDFT(Body *bodies, float dt, int nBodies,
         }
       } else if (MAC(bodies[target].x, bodies[target].y, bodies[target].z,
                      dft[j].x, dft[j].y, dft[j].z, dft[j].mass)) {
-#ifndef ENABLE_CILK
-        nInteractions++;
-#endif
         float dx = dft[j].x - bodies[target].x;
         float dy = dft[j].y - bodies[target].y;
         float dz = dft[j].z - bodies[target].z;
@@ -189,23 +217,86 @@ int MACInteractionsDFT(Body *bodies, float dt, int nBodies,
   }
 
   return nInteractions;
-}
+} */
 
-void reconstructOctree(Octree *&octree, Body *particles, int nBodies) {
-  // regenerate keys for new positions
+void reconstructOctree(Octree *&tree, Body *particles, int nBodies) {
   for (int i = 0; i < nBodies; ++i) {
     particles[i].key = computeMortonKey(particles[i], AXIS_RESOLUTION);
   }
 
   // free old octree, create new octree (will optimize later)
-  delete octree;
-  octree = new Octree(AXIS_RESOLUTION);
+  delete tree;
+  tree = new Octree(AXIS_RESOLUTION);
 
   for (int i = 0; i < nBodies; i++) {
-    octree->insert(particles[i]);
+    tree->insert(particles[i]);
   }
-  
-  octree->finalizeStats(octree->root);
+  uint64_t root_size = 0;
+  tree->finalizeStats(tree->root, root_size);
+
+  // tree->printTree(tree->root, 0);
+}
+
+void integratePositions(Body *p, float dt, int start, int end) {
+  for (int i = start; i < end; i++) {
+    p[i].x += (p[i].vx * dt);
+    p[i].y += (p[i].vy * dt);
+    p[i].z += (p[i].vz * dt);
+  }
+}
+
+void bodyForce(Octree *&tree, Body *p, float dt, int n) {
+  if (USE_TREE) {
+    BarnesHutInteractions(tree, p, dt, n);
+  } else {
+    allInteractionsDS(p, dt, n);
+  }
+}
+
+double nbodyIterate(Body *particles, float dt, int nBodies, int nIters) {
+
+  printf("Beginning nbody simulation...\n");
+  printf(" - %s method \n - %d bodies\n",
+         USE_TREE ? (USE_BH ? "MAC" : "DFT") : "DS", nBodies);
+  printf(" - MAC parameter: %f\n", THETA);
+  printf(" - Iterations: %d\n", nIters);
+  printf(" - Time step: %f\n", dt);
+  printf("-----------------------------------------------\n");
+
+  // begin benchmark
+  ctimer_t timer;
+  ctimer_start(&timer);
+
+  Octree *octree = nullptr;
+
+  if (USE_TREE) {
+    octree = new Octree(AXIS_RESOLUTION);
+  }
+
+  for (int iter = 1; iter <= nIters; iter++) {
+
+    if (USE_TREE) {
+      reconstructOctree(octree, particles, nBodies);
+    }
+
+    bodyForce(octree, particles, dt, nBodies);
+    integratePositions(particles, dt, 0, nBodies);
+  }
+
+  if (USE_TREE) {
+    delete octree;
+  }
+
+  ctimer_stop(&timer);
+  ctimer_measure(&timer);
+  double tElapsed = timespec_sec(timer.elapsed);
+
+  // Report time
+  if (PRINT_TIME) {
+    printf("Total time = %.6f seconds for %d iterations\n", tElapsed, nIters);
+  }
+
+  return tElapsed;
 }
 
 // Randomize the positions and velocities in the range [-1, 1],
@@ -231,84 +322,29 @@ void randomizeBodies(PhiloxEngine &rng, Body *bodies, int n) {
   }
 }
 
-float checkAccuracy(Body *p, Body *orig, int nBodies, int nIters) {
+float computeRmsError(Body *p, Body *orig, int nBodies, int nIters, float dt) {
+
   printf("-----------------------------------------------\n");
-  printf("ACCURACY CHECK AGAINST DS\n");
+  printf("COMPUTING RMS ERROR AGAINST DIRECT SUMMATION\n");
 
   USE_TREE = false;
   USE_BH = false;
   PRINT_TIME = false;
-  nbodyIterate(orig, 0.01f, nBodies, nIters);
+  nbodyIterate(orig, dt, nBodies, nIters);
   PRINT_TIME = true;
 
   // Compute RMS error(standard check for positional accuracy)
   double rmsError = 0.0;
   for (int i = 0; i < nBodies; i++) {
-    double dx = p[i].x - orig[i].x;
-    double dy = p[i].y - orig[i].y;
-    double dz = p[i].z - orig[i].z;
+    double dx = static_cast<double>(p[i].x - orig[i].x);
+    double dy = static_cast<double>(p[i].y - orig[i].y);
+    double dz = static_cast<double>(p[i].z - orig[i].z);
     rmsError += dx * dx + dy * dy + dz * dz;
   }
 
   rmsError = std::sqrt((rmsError / nBodies));
 
   return rmsError;
-}
-
-void integratePositions(Body *p, float dt, int start, int end) {
-  for (int i = start; i < end; i++) {
-    p[i].x += (p[i].vx * dt);
-    p[i].y += (p[i].vy * dt);
-    p[i].z += (p[i].vz * dt);
-  }
-}
-
-double nbodyIterate(Body *particles, float dt, int nBodies, int nIters) {
-
-  // begin benchmark
-  ctimer_t timer;
-  ctimer_start(&timer);
-
-  Octree *octree = nullptr;
-
-  if (USE_TREE) {
-    octree = new Octree(AXIS_RESOLUTION);
-  }
-
-  for (int iter = 1; iter <= nIters; iter++) {
-
-    if (USE_TREE) {
-      reconstructOctree(octree, particles, nBodies);
-    }
-
-    bodyForce(particles, dt, nBodies);
-    integratePositions(particles, dt, 0, nBodies);
-  }
-
-  if (USE_TREE) {
-    delete octree;
-  }
-
-  ctimer_stop(&timer);
-  ctimer_measure(&timer);
-  double tElapsed = timespec_sec(timer.elapsed);
-
-  // Report time
-  if (PRINT_TIME) {
-    printf("Total time = %.6f seconds\n", tElapsed);
-  }
-
-  return tElapsed;
-}
-
-void bodyForce(Body *p, float dt, int n) {
-  if (USE_TREE && USE_BH)
-    MACInteractionsDFT(p, dt, n);
-  else if (USE_TREE)
-    allInteractionsDFT(p, dt, n);
-  else {
-    allInteractionsDS(p, dt, n);
-  }
 }
 
 int libMain(const int argc, const char **argv) {
@@ -351,7 +387,6 @@ int libMain(const int argc, const char **argv) {
 
   // parse options
   int nBodies = result["nbodies"].as<int>();
-
   std::string method = result["method"].as<std::string>();
   float mac_param = result["param"].as<float>();
   int nIters = result["iterations"].as<int>();
@@ -376,14 +411,7 @@ int libMain(const int argc, const char **argv) {
     return EXIT_FAILURE;
   }
 
-  MAC_PARAM = mac_param;
-  printf("Beginning nbody simulation...\n");
-  printf(" - %s method \n - %d bodies\n",
-         USE_TREE ? (USE_BH ? "MAC" : "DFT") : "DS", nBodies);
-  printf(" - MAC parameter: %f\n", MAC_PARAM);
-  printf(" - Iterations: %d\n", nIters);
-  printf(" - Time step: %f\n", dt);
-  printf("-----------------------------------------------\n");
+  THETA = mac_param;
 
   // Allocate memory for nBodies
   Body *particles = new Body[nBodies];
@@ -401,7 +429,7 @@ int libMain(const int argc, const char **argv) {
   nbodyIterate(particles, dt, nBodies, nIters);
 
   if (errorCheck) {
-    float err = checkAccuracy(particles, particles_cp, nBodies, nIters);
+    float err = computeRmsError(particles, particles_cp, nBodies, nIters, dt);
     printf("RMS error: %f\n", err);
   }
 
