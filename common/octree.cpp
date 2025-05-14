@@ -68,6 +68,10 @@ Node::Node(Key key) {
   this->subTreeSize = 1;
   this->maskChildren = 0;
   this->bodyIdx.resize(0);
+  this->cx = 0.0f;
+  this->cy = 0.0f;
+  this->cz = 0.0f;
+  this->tm = 0.1f;
   for (int i = 0; i < 8; ++i)
     this->children[i] = nullptr;
 }

@@ -66,7 +66,6 @@ void BarnesHutDFS(Octree *&tree, Node *&node, Body *&particles, int tid, float &
     }
   } else {
     for (int i = 0; i < 8; ++i) {
-      // sparse DFS is possible here
       if (node->maskChildren & (1 << i)) {
         BarnesHutDFS(tree, node->children[i], particles, tid, Fx, Fy, Fz,
                     (level + 1));
@@ -119,7 +118,11 @@ void allInteractionsDS(Body *bodies, float dt, int nBodies) {
 
 void reconstructOctree(Octree *&tree, Body *particles, int nBodies) {
   for (int i = 0; i < nBodies; ++i) {
-    particles[i].key = computeMortonKey(particles[i], AXIS_RESOLUTION);
+    // Normalize to [0,1] for Morton key computation
+    float norm_x = particles[i].x / 10.0f;
+    float norm_y = particles[i].y / 10.0f;
+    float norm_z = particles[i].z / 10.0f;
+    particles[i].key = computeMortonKey({norm_x, norm_y, norm_z, 0, 0, 0, 1.0f, 0, 0}, AXIS_RESOLUTION);
   }
 
   // free old octree, create new octree (will optimize later)
@@ -135,7 +138,13 @@ void reconstructOctree(Octree *&tree, Body *particles, int nBodies) {
   // tree->printTree(tree->root, 0);
 }
 
-void wrap(float &pos, float &vel, float minv, float maxv) {
+void wrap(float &pos, float &vel, float minv , float maxv ) {
+  // Check for NaN
+  if (std::isnan(pos)) {
+    pos = minv;  // Reset to minimum value
+    vel = fabsf(vel);  // Make velocity positive
+  }
+  
   if (pos <= minv) {
     pos = minv;
     vel = fabsf(vel);
@@ -213,8 +222,8 @@ double nbodyIterate(Body *particles, float dt, int nBodies, int nIters) {
 // Randomize the positions and velocities in the range [-1, 1],
 // and assign a mass (every 7th float) in the range [0.1, 1.1].
 void randomizeBodies(PhiloxEngine &rng, Body *bodies, int n) {
-  std::uniform_real_distribution<double> x_dis(0, 0.99);
-  std::uniform_real_distribution<double> v_dis(0, 1);
+  std::uniform_real_distribution<float> x_dis(0.0, 10.0);  // Changed to [0,10]
+  std::uniform_real_distribution<float> v_dis(0, 1);
 
   for (int i = 0; i < n; i++) {
     Body &body = bodies[i];
@@ -223,8 +232,11 @@ void randomizeBodies(PhiloxEngine &rng, Body *bodies, int n) {
     body.z = x_dis(rng);
 
     body.index = i;
-    // set the key for the current body
-    body.key = computeMortonKey(body, AXIS_RESOLUTION);
+    // Normalize to [0,1] for Morton key computation
+    float norm_x = body.x / 10.0f;
+    float norm_y = body.y / 10.0f;
+    float norm_z = body.z / 10.0f;
+    body.key = computeMortonKey({norm_x, norm_y, norm_z, 0, 0, 0, 1.0f, 0, 0}, AXIS_RESOLUTION);
 
     body.vx = (v_dis(rng)) * 2 - 1;
     body.vy = (v_dis(rng)) * 2 - 1;

@@ -61,7 +61,7 @@ float computeRmsError(Body *particles, Body *orig, int nBodies, int nIters,
  * @param minv
  * @param maxv
  */
-void wrap(float &pos, float &vel, float minv = 0.01f, float maxv = 0.99f);
+void wrap(float &pos, float &vel, float minv = 0.01f, float maxv = 9.99f);
 
 /**
  * @brief Compute new positions after applying induced momentum
