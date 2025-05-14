@@ -8,7 +8,7 @@
 typedef uint64_t Key;
 
 typedef struct {
-  double x, y, z, vx, vy, vz, m; // each body now has a mass 'm'
+  float x, y, z, vx, vy, vz, m; // each body now has a mass 'm'
   Key key;
   int index; // index of the body in the bodies array
 } Body;
@@ -33,15 +33,12 @@ public:
   bool isLeaf;
   Node *parent;
   Node *children[8];
-  char whichChildren;
-
+  uint8_t maskChildren;
   std::vector<int> bodyIdx; // indeces into the bodies array
-
-  int subTreeSize; // used to build autoropes
-  int nLeaves;     // number of leaves in the subtree
-
-  float x, y, z; // center of mass of the node
-  float mass;    // total mass of the node
+  uint64_t subTreeSize;     // used to build autoropes
+  int nLeaves;              // number of leaves in the subtree
+  float cx, cy, cz;         // centroid pos
+  float tm;                 // total mass
   int nBodies;
 
   Node(Key key, bool isLeaf);
@@ -66,20 +63,18 @@ class Octree {
 public:
   int resolution;
   Node *root;
-  int leafLength;
-  int nLevels; // does not count root as a level
 
-  Octree(int maxKeyLength, int resolution);
+  Octree(int resolution);
   ~Octree();
-  bool isLeaf(Node *n);
-  void addChild(Node *parent, int index, bool isLeaf, Key key);
-  int getOctantIdx(Key key, int level);
-  int insert(Body body);
-  void insertRec(Node *node, Body &body);
-  void printTree(Node *node, int level);
+  bool isEmpty(Node *&n);
+  bool isLeaf(Node *&n);
+  int getOctantIndex(Key key, int level);
+  void updateAggregateStats(Node *&node, Body &body);
+  int subdivide(Node *&node, int level);
+  int insert(Body &body);
+  void printTree(Node *&node, int level);
   void buildDFT(std::vector<DFTNode> &nodes, Body *bodies);
   void traverse(Node *node, std::vector<DFTNode> &nodes);
-  void setSubtreeSizes(Node *node, Body *bodies);
   void splitNode(Node *current, int index, int nLevels, int level);
 };
 

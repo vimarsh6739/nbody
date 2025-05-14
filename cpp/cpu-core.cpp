@@ -204,7 +204,7 @@ void reconstructOctree(Octree *&octree, std::vector<DFTNode> &dft,
 
   // free old octree, create new octree (will optimize later)
   delete octree;
-  octree = new Octree(MAX_KEY_LENGTH, AXIS_RESOLUTION);
+  octree = new Octree(AXIS_RESOLUTION);
 
   int nUniqueLeaves = 0;
   for (int i = 0; i < nBodies; i++) {
@@ -284,7 +284,7 @@ double nbodyIterate(Body *p, float dt, int nBodies, int nIters) {
   Octree *octree = nullptr;
 
   if (USE_TREE) {
-    octree = new Octree(MAX_KEY_LENGTH, AXIS_RESOLUTION);
+    octree = new Octree(AXIS_RESOLUTION);
   }
 
   for (int iter = 1; iter <= nIters; iter++) {

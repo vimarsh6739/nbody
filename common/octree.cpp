@@ -3,7 +3,10 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <string>
+
+/* Morton Representation */
 
 Key getKey(Body body, int resolution) {
   Key key = 0;
@@ -55,11 +58,13 @@ int binaryLength(Key n) {
   return length;
 }
 
+/* Node functions */
+
 Node::Node(Key key, bool isLeaf) {
   this->key = key;
   this->isLeaf = isLeaf;
   this->subTreeSize = 1;
-  this->whichChildren = 0;
+  this->maskChildren = 0;
 
   for (int i = 0; i < 8; ++i)
     this->children[i] = nullptr;
@@ -73,215 +78,104 @@ Node::~Node() {
   }
 }
 
-Octree::Octree(int maxKeyLength, int resolution)
-    : resolution(resolution), root(nullptr), leafLength(maxKeyLength),
-      nLevels(maxKeyLength / 3) {
-  root = new Node(1, false);
-}
+/* Octree functions */
+
+Octree::Octree(int resolution) : resolution(resolution), root(nullptr) {}
 
 Octree::~Octree() {
   delete root;
   root = nullptr;
 }
 
-bool Octree::isLeaf(Node *node) {
+bool Octree::isEmpty(Node *&node) { return node == nullptr; }
+
+bool Octree::isLeaf(Node *&node) {
   return (node->key & (1LL << (3 * resolution))) != 0;
 }
 
-void Octree::addChild(Node *parent, int index, bool isLeaf, Key mykey) {
-  if (!isLeaf) {
-    mykey = (parent->key << 3LL) | index;
-  }
-
-  assert(parent->isLeaf == false);
-  assert(mykey > 0);
-
-  parent->children[index] = new Node(mykey, isLeaf);
-  parent->children[index]->parent = parent;
-  parent->whichChildren |= 1 << index;
-}
-
-void Octree::splitNode(Node *current, int index, int nLevels, int level) {
-  // pushes the child of current one level deeper into the tree
-  Node *child = current->children[index]; // child needs to be split
-
-  int currentlevel = binaryLength(current->key) / 3;
-  int newlevel = currentlevel + 1;
-  int childlevel = binaryLength(child->key) / 3;
-
-  assert(newlevel < nLevels);
-  assert(newlevel > currentlevel);
-  assert(childlevel > newlevel);
-
-  // compute the key for the new node
-  Key newkey = child->key >> (3 * (nLevels - newlevel));
-
-  // compute index for child as a child of the new node
-  int childIndex = (child->key >> (3 * (nLevels - (newlevel + 1)))) & 0x7;
-
-  Node *newParent = new Node(newkey, false);
-
-  current->children[index] = newParent;
-  newParent->parent = current;
-
-  child->parent = newParent;
-  newParent->children[childIndex] = child;
-  newParent->whichChildren |= 1 << childIndex;
-}
-
-int Octree::getOctantIdx(Key key, int level) {
-  Key shifted = key >> (3 * (nLevels - level - 1));
+int Octree::getOctantIndex(Key key, int level) {
+  // [LEAF_BIT] [level0 : 3] [level1 : 3] [level2 : 3] ... [level{r-1} : 3]
+  Key shifted = key >> (3 * (resolution - 1 - level));
   return ((int)shifted & 0x7);
 }
 
-// recursive insert into octree
-static void insertRec(Node *curr, Body &b) {}
+void Octree::updateAggregateStats(Node *&node, Body &body) {
+  // update centroid and total mass
+  node->cx += body.x * body.m;
+  node->cy += body.y * body.m;
+  node->cz += body.z * body.m;
+  node->tm += body.m;
 
-int Octree::insert(Body body) {
+  // update subTreeSize, handle duplicates
+  if (!isLeaf(node) || (node->bodyIdx.size() > 0))
+    node->subTreeSize++;
+}
 
-  Node *current = root;
-  Key key = body.key;
+int Octree::subdivide(Node *&node, int level) {
+  int subidx = this->getOctantIndex(node->key, level + 1);
+  node->children[subidx] = new Node(node->key, true); // push down leaf
+  node->maskChildren |= (1 << subidx);                // update mask
+  node->key -= (1LL << (3 * resolution));             // mark as internal node
+  return subidx;
+}
 
-  int arrIndex = body.index;
+int Octree::insert(Body &body) {
 
-  assert(key >> (leafLength - 1) == 1);  // check that all keys are prepended
-  assert(nLevels * 3 == leafLength - 1); // check nlevels
+  if (isEmpty(root)) {
+    root = new Node(body.key, true);
+    return 1;
+  }
 
-  // insert internal nodes
-  int level = 0;
-  while (level < nLevels) {
-
-    if (current->whichChildren == 0) {
+  int addedLeaf = 0;
+  Node *ptr = root;
+  for (int level = 0; level < resolution; ++level) {
+    if (isEmpty(ptr)) {
+      // alloc and mark as leaf
+      ptr = new Node(body.key, true);
+      updateAggregateStats(ptr, body);
+      addedLeaf = 1;
       break;
-    }
-
-    int index = this->getOctantIdx(key, level);
-
-    if (current->children[index] == nullptr) {
-      // new child at this leaf must be created
-      addChild(current, index, false, key);
-
-      // if other leaves exist at this level, split them.
-      // not sure if this isnecessary
-      for (int i = 0; i < 8; i++) {
-        if (current->children[i] != nullptr && current->children[i]->isLeaf) {
-          splitNode(current, i, nLevels, level);
-        }
+    } else if (isLeaf(ptr)) {
+      if (level < resolution - 1) {
+        int next = subdivide(ptr, level);
+        updateAggregateStats(ptr, body);
+        ptr = ptr->children[next];
+      } else {
+        // duplicate key
+        ptr->bodyIdx.push_back(body.index);
+        updateAggregateStats(ptr, body);
       }
     } else {
-      // child already exists. either keep traversing, or split
-      Node *child = current->children[index];
-      if (child->isLeaf) {
-        if (child->key == key) {
-          // duplicate key, chain body into bucket
-          break;
-        }
-        splitNode(current, index, nLevels, level);
-      }
-    }
-
-    current = current->children[index];
-    level = binaryLength(current->key) / 3;
-  }
-
-  // insert leaf
-  int index = (key >> (3 * (nLevels - level - 1))) & 0x7;
-  int newLeafCreated = 0;
-
-  // otherwise have to handle duplicate keys
-  if (current->children[index] == nullptr) {
-    addChild(current, index, true, key);
-    assert(current->children[index]->key == key);
-    current->children[index]->bodyIdx.push_back(arrIndex);
-    newLeafCreated = 1;
-  } else {
-    assert(current->children[index]->key == key);
-    current->children[index]->bodyIdx.push_back(arrIndex);
-    if (current->children[index]->bodyIdx.size() > 1) {
+      updateAggregateStats(ptr, body);
+      int next = this->getOctantIndex(body.key, level + 1);
+      ptr = ptr->children[next];
     }
   }
 
-  return newLeafCreated;
-};
+  return addedLeaf;
+}
 
-void Octree::printTree(Node *node, int level) {
-  if (node == NULL)
+void Octree::printTree(Node *&node, int level) {
+
+  if (isEmpty(node))
     return;
+
+  printf("%d:", level);
 
   for (int i = 0; i < level; i++)
     printf("  ");
 
-  if (node->isLeaf) {
-    printf("0b%s (%lu) (%d)\n", binaryString<Key>(node->key).c_str(), node->key,
-           node->nBodies);
-  } else {
-    printf("0b%s (%lu)\n", binaryString<Key>(node->key).c_str(), node->key);
-  }
+  printf("0b%s (%lu) (%lu)\n", binaryString<Key>(node->key).c_str(), node->key,
+         node->subTreeSize);
 
-  if (!node->isLeaf) {
+  if (!isLeaf(node)) {
     for (int i = 0; i < 8; i++) {
       printTree(node->children[i], level + 1);
     }
   }
 };
 
-void Octree::setSubtreeSizes(Node *node, Body *bodies) {
-  if (node == NULL)
-    return;
-
-  float x = 0.0f, y = 0.0f, z = 0.0f;
-  float mass = 0.0f;
-
-  node->nLeaves = 0;
-
-  if (node->isLeaf) {
-    node->subTreeSize = 1;
-
-    node->nLeaves = node->bodyIdx.size();
-
-    // compute center of mass and relevant aggregate information
-    if (node->bodyIdx.size() == 0) {
-      return;
-    }
-
-    for (int i = 0; i < node->bodyIdx.size(); i++) {
-      mass += bodies[node->bodyIdx[i]].m;
-      x += bodies[node->bodyIdx[i]].x;
-      y += bodies[node->bodyIdx[i]].y;
-      z += bodies[node->bodyIdx[i]].z;
-    }
-    node->x = x / node->bodyIdx.size();
-    node->y = y / node->bodyIdx.size();
-    node->z = z / node->bodyIdx.size();
-    node->mass = mass;
-    node->nBodies = node->bodyIdx.size();
-    return;
-  }
-
-  for (int i = 0; i < 8; i++) {
-    if (node->whichChildren & (1 << i)) {
-      setSubtreeSizes(node->children[i], bodies);
-      node->subTreeSize += node->children[i]->subTreeSize;
-      node->nLeaves += node->children[i]->nLeaves;
-
-      x += node->children[i]->x * node->children[i]->nBodies;
-      y += node->children[i]->y * node->children[i]->nBodies;
-      z += node->children[i]->z * node->children[i]->nBodies;
-      mass += node->children[i]->mass;
-      node->nBodies += node->children[i]->nBodies;
-    }
-  }
-
-  if (node->nBodies > 0) {
-    node->x = x / node->nBodies;
-    node->y = y / node->nBodies;
-    node->z = z / node->nBodies;
-    node->mass = mass;
-  }
-}
-
 void Octree::buildDFT(std::vector<DFTNode> &nodes, Body *bodies) {
-  setSubtreeSizes(this->root, bodies);
   traverse(this->root, nodes);
 
   // printf("DFT: ");
@@ -304,10 +198,10 @@ void Octree::traverse(Node *node, std::vector<DFTNode> &nodes) {
   dftNode.isLeaf = node->isLeaf;
   dftNode.index = nodes.size();
 
-  dftNode.x = node->x;
-  dftNode.y = node->y;
-  dftNode.z = node->z;
-  dftNode.mass = node->mass;
+  dftNode.x = node->cx;
+  dftNode.y = node->cy;
+  dftNode.z = node->cz;
+  dftNode.mass = node->tm;
   dftNode.nBodies = node->nBodies;
 
   dftNode.autorope =
@@ -320,7 +214,7 @@ void Octree::traverse(Node *node, std::vector<DFTNode> &nodes) {
 
   if (!node->isLeaf) {
     for (int i = 0; i < 8; i++) {
-      if (node->whichChildren & (1 << i))
+      if (node->maskChildren & (1 << i))
         traverse(node->children[i], nodes);
     }
   }

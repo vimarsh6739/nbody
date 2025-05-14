@@ -79,7 +79,7 @@ TEST(OctreeTest, NodeConstructor) {
   ASSERT_EQ(node.key, 42);
   ASSERT_TRUE(node.isLeaf);
   ASSERT_EQ(node.subTreeSize, 1);
-  ASSERT_EQ(node.whichChildren, 0);
+  ASSERT_EQ(node.maskChildren, 0);
   ASSERT_EQ(node.parent, nullptr);
 
   // Check that all children are nullptr
@@ -90,20 +90,18 @@ TEST(OctreeTest, NodeConstructor) {
 
 // Test Octree constructor
 TEST(OctreeTest, OctreeConstructor) {
-  Octree octree(21, 21);
+  Octree octree(7);
 
   // Check initial values
-  ASSERT_EQ(octree.leafLength, 21);
-  ASSERT_EQ(octree.nLevels, 7); // 21 / 3 = 7
-  ASSERT_NE(octree.root, nullptr);
-  ASSERT_EQ(octree.root->key, 1);
-  ASSERT_FALSE(octree.root->isLeaf);
+  ASSERT_EQ(octree.resolution, 7); // 21 / 3 = 7
+  ASSERT_EQ(octree.root, nullptr);
+  ASSERT_TRUE(octree.isEmpty(octree.root));
 }
 
 // Test Octree insertion
 TEST(OctreeTest, OctreeInsert) {
-  GTEST_SKIP() << "Skipping octree insertion";
-  Octree octree(sizeof(Key) * 8, 16);
+  // GTEST_SKIP() << "Skipping octree insertion";
+  Octree octree(16);
 
   // Create a test body with a properly formatted key
   // The key must have a 1 in the most significant bit (prepended)
@@ -111,23 +109,24 @@ TEST(OctreeTest, OctreeInsert) {
   Body body = {0.5f, 0.25f, 0.125f, 0.0f, 0.0f, 0.0f, 1.0f, 0, 0};
 
   // For testing, we need to set a valid key (with 1 prepended)
-  Key baseKey = getKey(body, 20);
+  Key baseKey = getKey(body, 16);
   printf("KEY: %lu, KEY LENGTH: %d\n", baseKey, binaryLength(baseKey));
   body.key = baseKey;
 
   // Insert the body and check the result
   int result = octree.insert(body);
   ASSERT_EQ(result, 1); // Should return 1 for successful insertion
-
+  
   // Insert the same body again to test handling of duplicates
   int resultDup = octree.insert(body);
+
   ASSERT_EQ(resultDup, 0); // Should return 0 for duplicate
 }
 
 // Test DFT error
 TEST(OctreeTest, DFTError) {
   GTEST_SKIP() << "Skipping end to end test";
-  Octree octree(sizeof(Key) * 8, 16);
+  Octree octree(16);
 
   // Create a test body with a properly formatted key
   // The key must have a 1 in the most significant bit (prepended)
