@@ -23,7 +23,7 @@ bool USE_BH = true;    // use barnes hut or not
 bool PRINT_TIME = true;
 float MAC_PARAM = .5; // MAC parameter
 
-int SHIFT_DIGITS = 16;
+int AXIS_RESOLUTION = 16;
 int MAX_KEY_LENGTH = sizeof(Key) * 8;
 
 bool MAC(float target_x, float target_y, float target_z, float x, float y,
@@ -199,12 +199,12 @@ void reconstructOctree(Octree *&octree, std::vector<DFTNode> &dft,
 
   // regenerate keys for new positions
   for (int i = 0; i < nBodies; ++i) {
-    particles[i].key = getKey(particles[i], SHIFT_DIGITS);
+    particles[i].key = getKey(particles[i], AXIS_RESOLUTION);
   }
 
   // free old octree, create new octree (will optimize later)
   delete octree;
-  octree = new Octree(MAX_KEY_LENGTH);
+  octree = new Octree(MAX_KEY_LENGTH, AXIS_RESOLUTION);
 
   int nUniqueLeaves = 0;
   for (int i = 0; i < nBodies; i++) {
@@ -233,7 +233,7 @@ void randomizeBodies(PhiloxEngine &rng, Body *bodies, int n) {
 
     body.index = i;
     // set the key for the current body
-    body.key = getKey(body, SHIFT_DIGITS);
+    body.key = getKey(body, AXIS_RESOLUTION);
 
     body.vx = (v_dis(rng)) * 2 - 1;
     body.vy = (v_dis(rng)) * 2 - 1;
@@ -284,7 +284,7 @@ double nbodyIterate(Body *p, float dt, int nBodies, int nIters) {
   Octree *octree = nullptr;
 
   if (USE_TREE) {
-    octree = new Octree(MAX_KEY_LENGTH);
+    octree = new Octree(MAX_KEY_LENGTH, AXIS_RESOLUTION);
   }
 
   for (int iter = 1; iter <= nIters; iter++) {
@@ -344,8 +344,9 @@ int libMain(const int argc, const char **argv) {
       "q,quiet", "Suppress timing output",
       cxxopts::value<bool>()->default_value("false"))(
       "h,help", "Print usage information")(
-      "w,shiftwidth", "Octree grid resolution (same for x,y,z axis)",
-      cxxopts::value<int>()->default_value("16"))("e,error", "Enable flag");
+      "w,resolution", "Octree bit-resolution (same for x,y,z axis)",
+      cxxopts::value<int>()->default_value("16"))("e,error",
+                                                  "Check for accuracy");
 
   auto result = options.parse(argc, argv);
 
@@ -369,7 +370,7 @@ int libMain(const int argc, const char **argv) {
   float dt = result["timestep"].as<float>();
   SOFTENING = result["softening"].as<float>();
   PRINT_TIME = !result["quiet"].as<bool>();
-  SHIFT_DIGITS = result["shiftwidth"].as<int>();
+  AXIS_RESOLUTION = result["resolution"].as<int>();
 
   // Set simulation method
   if (method == "DS") {
@@ -383,8 +384,8 @@ int libMain(const int argc, const char **argv) {
     USE_BH = true;
   } else {
     std::cerr << "Unknown method: " << method << std::endl;
-    std::cout << "Valid methods are: DS, DFT, MAC" << std::endl;
-    return -1;
+    std::cerr << "Valid methods are: DS, DFT, MAC" << std::endl;
+    return EXIT_FAILURE;
   }
 
   MAC_PARAM = mac_param;
@@ -395,11 +396,6 @@ int libMain(const int argc, const char **argv) {
   printf(" - Iterations: %d\n", nIters);
   printf(" - Time step: %f\n", dt);
   printf("-----------------------------------------------\n");
-
-  // TODO: other parameters we might want to control:
-  // - SHIFT_DIGITS (controls how many keys/buckets are created)
-  // - MAC_PARAM (controls the MAC parameter)
-  // - SOFTENING (controls the softening factor)
 
   // Allocate memory for nBodies
   Body *particles = new Body[nBodies];
@@ -415,6 +411,7 @@ int libMain(const int argc, const char **argv) {
   }
 
   nbodyIterate(particles, dt, nBodies, nIters);
+
   if (errorCheck) {
     float err = checkAccuracy(particles, particles_cp, nBodies, nIters);
     printf("RMS error: %f\n", err);

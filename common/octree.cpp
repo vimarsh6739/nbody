@@ -5,13 +5,13 @@
 #include <cstdlib>
 #include <string>
 
-Key getKey(Body body, int shift_digits) {
+Key getKey(Body body, int resolution) {
   Key key = 0;
 
   float x = body.x, y = body.y, z = body.z;
 
   // shift and trunacte
-  Key shift = 1 << shift_digits;
+  Key shift = 1LL << resolution;
   Key xint = static_cast<Key>(x * shift);
   Key yint = static_cast<Key>(y * shift);
   Key zint = static_cast<Key>(z * shift);
@@ -37,11 +37,11 @@ Key getKey(Body body, int shift_digits) {
   }
 
   // assert no key overflow
-  assert(pos <= (sizeof(Key) * 8 - 1));
+  assert((pos + 1) <= sizeof(Key) * 8);
 
-  // prepend a 1 to the key (because this is a leaf)
-  // actual key size = `pos` bits
-  key += (1LL << (sizeof(Key) * 8 - 1));
+  // actual key size = `(3*shift_digits+1)` bits
+  // prepend a 1 to the key (at (1<<3*shift_digits)) because its a leaf
+  key += (1LL << (3 * resolution));
 
   return key;
 }
@@ -73,16 +73,19 @@ Node::~Node() {
   }
 }
 
-Octree::Octree(int maxKeyLength) {
+Octree::Octree(int maxKeyLength, int resolution)
+    : resolution(resolution), root(nullptr), leafLength(maxKeyLength),
+      nLevels(maxKeyLength / 3) {
   root = new Node(1, false);
-  leafLength = maxKeyLength;
-  nLevels = maxKeyLength / 3;
 }
 
-Octree::~Octree() { delete root; root=nullptr;}
+Octree::~Octree() {
+  delete root;
+  root = nullptr;
+}
 
 bool Octree::isLeaf(Node *node) {
-  return (node->key & (1LL << (sizeof(Key) * 8 - 1))) != 0;
+  return (node->key & (1LL << (3 * resolution))) != 0;
 }
 
 void Octree::addChild(Node *parent, int index, bool isLeaf, Key mykey) {
@@ -158,14 +161,13 @@ int Octree::insert(Body body) {
       // new child at this leaf must be created
       addChild(current, index, false, key);
 
-      // // if other leaves exist at this level, split them.
-      // // not sure if this isnecessary
-      // for (int i = 0; i < 8; i++) {
-      //   if (current->children[i] != nullptr && current->children[i]->isLeaf)
-      //   {
-      //     splitNode(current, i, nLevels, level);
-      //   }
-      // }
+      // if other leaves exist at this level, split them.
+      // not sure if this isnecessary
+      for (int i = 0; i < 8; i++) {
+        if (current->children[i] != nullptr && current->children[i]->isLeaf) {
+          splitNode(current, i, nLevels, level);
+        }
+      }
     } else {
       // child already exists. either keep traversing, or split
       Node *child = current->children[index];
@@ -210,8 +212,8 @@ void Octree::printTree(Node *node, int level) {
     printf("  ");
 
   if (node->isLeaf) {
-    printf("0b%s (%lu) (%lu)\n", binaryString<Key>(node->key).c_str(),
-           node->key, node->nBodies);
+    printf("0b%s (%lu) (%d)\n", binaryString<Key>(node->key).c_str(), node->key,
+           node->nBodies);
   } else {
     printf("0b%s (%lu)\n", binaryString<Key>(node->key).c_str(), node->key);
   }
