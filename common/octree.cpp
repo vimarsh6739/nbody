@@ -1,11 +1,59 @@
 #include "octree.h"
 #include <cassert>
-#include <cstdlib>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <string>
 
-#define SHIFT_DIGITS 20
+Key getKey(Body body, int shift_digits) {
+  Key key = 0;
+
+  float x = body.x, y = body.y, z = body.z;
+
+  // shift and trunacte
+  Key shift = 1 << shift_digits;
+  Key xint = static_cast<Key>(x * shift);
+  Key yint = static_cast<Key>(y * shift);
+  Key zint = static_cast<Key>(z * shift);
+
+  // Check for overflow
+  if (xint < 0 || yint < 0 || zint < 0) {
+    fprintf(stderr, "Error: Integer overflow detected in getKeyNoPrepend\n");
+    exit(EXIT_FAILURE);
+  }
+
+  uint64_t pos = 0;
+  while (xint || yint || zint) {
+    // construct using LSB
+    key |= (xint & 1) << pos;
+    key |= (yint & 1) << (pos + 1LL);
+    key |= (zint & 1) << (pos + 2LL);
+
+    xint = xint >> 1LL;
+    yint = yint >> 1LL;
+    zint = zint >> 1LL;
+
+    pos += 3;
+  }
+
+  // assert no key overflow
+  assert(pos <= (sizeof(Key) * 8 - 1));
+
+  // prepend a 1 to the key (because this is a leaf)
+  // actual key size = `pos` bits
+  key += (1LL << (sizeof(Key) * 8 - 1));
+
+  return key;
+}
+
+// should be a multiple of 3
+int binaryLength(Key n) {
+  if (n == 0)
+    return 0;
+
+  int length = (int)log2(n) + 1;
+  return length;
+}
 
 Node::Node(Key key, bool isLeaf) {
   this->key = key;
@@ -18,10 +66,23 @@ Node::Node(Key key, bool isLeaf) {
   this->parent = nullptr;
 }
 
+Node::~Node() {
+  for (int i = 0; i < 8; ++i) {
+    delete children[i];
+    children[i] = nullptr;
+  }
+}
+
 Octree::Octree(int maxKeyLength) {
   root = new Node(1, false);
   leafLength = maxKeyLength;
   nLevels = maxKeyLength / 3;
+}
+
+Octree::~Octree() { delete root; root=nullptr;}
+
+bool Octree::isLeaf(Node *node) {
+  return (node->key & (1LL << (sizeof(Key) * 8 - 1))) != 0;
 }
 
 void Octree::addChild(Node *parent, int index, bool isLeaf, Key mykey) {
@@ -65,6 +126,14 @@ void Octree::splitNode(Node *current, int index, int nLevels, int level) {
   newParent->whichChildren |= 1 << childIndex;
 }
 
+int Octree::getOctantIdx(Key key, int level) {
+  Key shifted = key >> (3 * (nLevels - level - 1));
+  return ((int)shifted & 0x7);
+}
+
+// recursive insert into octree
+static void insertRec(Node *curr, Body &b) {}
+
 int Octree::insert(Body body) {
 
   Node *current = root;
@@ -79,24 +148,24 @@ int Octree::insert(Body body) {
   int level = 0;
   while (level < nLevels) {
 
-    Key shifted = key >> (3 * (nLevels - level - 1));
-    int index = (int)shifted & 0x7;
-
     if (current->whichChildren == 0) {
       break;
     }
 
-    if (current->children[index] == NULL) {
+    int index = this->getOctantIdx(key, level);
+
+    if (current->children[index] == nullptr) {
       // new child at this leaf must be created
       addChild(current, index, false, key);
 
-      // if other leaves exist at this level, split them.
-      // not sure if this isnecessary
-      for (int i = 0; i < 8; i++) {
-        if (current->children[i] != NULL && current->children[i]->isLeaf) {
-          splitNode(current, i, nLevels, level);
-        }
-      }
+      // // if other leaves exist at this level, split them.
+      // // not sure if this isnecessary
+      // for (int i = 0; i < 8; i++) {
+      //   if (current->children[i] != nullptr && current->children[i]->isLeaf)
+      //   {
+      //     splitNode(current, i, nLevels, level);
+      //   }
+      // }
     } else {
       // child already exists. either keep traversing, or split
       Node *child = current->children[index];
@@ -118,15 +187,15 @@ int Octree::insert(Body body) {
   int newLeafCreated = 0;
 
   // otherwise have to handle duplicate keys
-  if (current->children[index] == NULL) {
+  if (current->children[index] == nullptr) {
     addChild(current, index, true, key);
     assert(current->children[index]->key == key);
-    current->children[index]->bodies.push_back(arrIndex);
+    current->children[index]->bodyIdx.push_back(arrIndex);
     newLeafCreated = 1;
   } else {
     assert(current->children[index]->key == key);
-    current->children[index]->bodies.push_back(arrIndex);
-    if (current->children[index]->bodies.size() > 1) {
+    current->children[index]->bodyIdx.push_back(arrIndex);
+    if (current->children[index]->bodyIdx.size() > 1) {
     }
   }
 
@@ -154,56 +223,6 @@ void Octree::printTree(Node *node, int level) {
   }
 };
 
-Key getKey(Body body, int shift_digits) {
-  Key key = 0;
-
-  float x = body.x, y = body.y, z = body.z;
-
-  // shift and trunacte
-  Key shift = 1 << shift_digits;
-  Key xint = static_cast<Key>(x * shift);
-  Key yint = static_cast<Key>(y * shift);
-  Key zint = static_cast<Key>(z * shift);
-
-  // Check for overflow
-  if (xint < 0 || yint < 0 || zint < 0) {
-    fprintf(stderr, "Error: Integer overflow detected in getKeyNoPrepend\n");
-    exit(EXIT_FAILURE);
-  }
-
-  uint64_t pos = 0;
-  while (xint || yint || zint) {
-    // construct using LSB
-    key |= (xint & 1) << pos;
-    key |= (yint & 1) << (pos + 1LL);
-    key |= (zint & 1) << (pos + 2LL);
-
-    xint = xint >> 1LL;
-    yint = yint >> 1LL;
-    zint = zint >> 1LL;
-
-    pos += 3;
-  }
-
-  // assert no key overflow
-  assert(pos <= (sizeof(Key) * 8 - 1));
-
-  // prepend a 1 to the key (because this is a leaf)
-  // actual key size = `pos` bits
-  key += (1LL << (sizeof(Key) * 8 - 1)); 
-
-  return key;
-}
-
-// should be a multiple of 3
-int binaryLength(Key n) {
-  if (n == 0)
-    return 0;
-
-  int length = (int)log2(n) + 1;
-  return length;
-}
-
 void Octree::setSubtreeSizes(Node *node, Body *bodies) {
   if (node == NULL)
     return;
@@ -216,24 +235,24 @@ void Octree::setSubtreeSizes(Node *node, Body *bodies) {
   if (node->isLeaf) {
     node->subTreeSize = 1;
 
-    node->nLeaves = node->bodies.size();
+    node->nLeaves = node->bodyIdx.size();
 
     // compute center of mass and relevant aggregate information
-    if (node->bodies.size() == 0) {
+    if (node->bodyIdx.size() == 0) {
       return;
     }
 
-    for (int i = 0; i < node->bodies.size(); i++) {
-      mass += bodies[node->bodies[i]].m;
-      x += bodies[node->bodies[i]].x;
-      y += bodies[node->bodies[i]].y;
-      z += bodies[node->bodies[i]].z;
+    for (int i = 0; i < node->bodyIdx.size(); i++) {
+      mass += bodies[node->bodyIdx[i]].m;
+      x += bodies[node->bodyIdx[i]].x;
+      y += bodies[node->bodyIdx[i]].y;
+      z += bodies[node->bodyIdx[i]].z;
     }
-    node->x = x / node->bodies.size();
-    node->y = y / node->bodies.size();
-    node->z = z / node->bodies.size();
+    node->x = x / node->bodyIdx.size();
+    node->y = y / node->bodyIdx.size();
+    node->z = z / node->bodyIdx.size();
     node->mass = mass;
-    node->nBodies = node->bodies.size();
+    node->nBodies = node->bodyIdx.size();
     return;
   }
 
@@ -293,7 +312,7 @@ void Octree::traverse(Node *node, std::vector<DFTNode> &nodes) {
       dftNode.index +
       node->subTreeSize; // if autorope is out of bounds, traversal is donexw
 
-  dftNode.bodies = node->bodies;
+  dftNode.bodies = node->bodyIdx;
 
   nodes.push_back(dftNode);
 

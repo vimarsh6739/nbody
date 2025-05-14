@@ -31,12 +31,11 @@ class Node {
 public:
   Key key;
   bool isLeaf;
-
   Node *parent;
   Node *children[8];
   char whichChildren;
 
-  std::vector<int> bodies; // indeces into the bodies array
+  std::vector<int> bodyIdx; // indeces into the bodies array
 
   int subTreeSize; // used to build autoropes
   int nLeaves;     // number of leaves in the subtree
@@ -46,6 +45,7 @@ public:
   int nBodies;
 
   Node(Key key, bool isLeaf);
+  ~Node();
 };
 
 typedef struct {
@@ -69,8 +69,12 @@ public:
   int nLevels; // does not count root as a level
 
   Octree(int maxKeyLength);
+  ~Octree();
+  bool isLeaf(Node* n);
   void addChild(Node *parent, int index, bool isLeaf, Key key);
+  int getOctantIdx(Key key, int level);
   int insert(Body body);
+  void insertRec(Node* node, Body &body);
   void printTree(Node *node, int level);
   void buildDFT(std::vector<DFTNode> &nodes, Body *bodies);
   void traverse(Node *node, std::vector<DFTNode> &nodes);
