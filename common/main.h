@@ -4,6 +4,7 @@
 
 #include "octree.h"
 #include "philox_engine.h"
+#include <vector>
 
 extern float SOFTENING;
 #define POSMAX 100
@@ -19,9 +20,9 @@ extern int MAX_KEY_LENGTH;
 extern bool CUDA;
 
 void randomizeBodies(PhiloxEngine &rng, Body *bodies, int n);
-void createOctree(std::vector<DFTNode> &dft, Octree *octree, Body *bodies,
+void reconstructOctree(Octree *&octree,std::vector<DFTNode> &dft, Body *bodies,
                   int nBodies);
-void nbodyIterate(Body *p, float dt, int nBodies, int nIters);
+double nbodyIterate(Body *p, float dt, int nBodies, int nIters);
 float checkAccuracy(Body *p, Body *orig, int nBodies, int nIters);
 void integratePositions(Body *p, float dt, int start, int end);
 int bodyForce(Body *p, float dt, int n, std::vector<DFTNode> dft);

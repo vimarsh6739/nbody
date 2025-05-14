@@ -1,11 +1,13 @@
-#include <ctimer.h>
-#include <cxxopts.hpp>
-#include <main.h>
+#include "octree.h"
 #include <assert.h>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctimer.h>
+#include <cxxopts.hpp>
 #include <iostream>
+#include <main.h>
+#include <new>
 #include <random>
 #include <string>
 
@@ -24,12 +26,6 @@ float MAC_PARAM = .5; // MAC parameter
 int SHIFT_DIGITS = 16;
 int MAX_KEY_LENGTH = sizeof(Key) * 8;
 
-#ifdef ENABLE_CUDA
-extern bool CUDA = true;
-#else
-extern bool CUDA = false;
-#endif
-
 bool MAC(float target_x, float target_y, float target_z, float x, float y,
          float z, float mass) {
   float dx = target_x - x;
@@ -37,14 +33,14 @@ bool MAC(float target_x, float target_y, float target_z, float x, float y,
   float dz = target_z - z;
   float distance = sqrtf(dx * dx + dy * dy + dz * dz);
   float size = mass;
-  
+
   return size / distance < MAC_PARAM;
 }
 
 int allInteractionsDFT(Body *bodies, float dt, int nBodies,
                        std::vector<DFTNode> &dft) {
   int nInteractions = 0;
-  
+
   std::vector<float> new_vx(nBodies), new_vy(nBodies), new_vz(nBodies);
 
 #ifdef ENABLE_CILK
@@ -54,10 +50,11 @@ int allInteractionsDFT(Body *bodies, float dt, int nBodies,
 #endif
     float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
 
-    for (int j = 0; j < dft.size(); j++) {
+    for (uint j = 0; j < dft.size(); j++) {
       if (dft[j].isLeaf) {
         for (int bIndex : dft[j].bodies) {
-          if (bIndex == target) continue;
+          if (bIndex == target)
+            continue;
 #ifndef ENABLE_CILK
           nInteractions++;
 #endif
@@ -74,7 +71,7 @@ int allInteractionsDFT(Body *bodies, float dt, int nBodies,
         }
       }
     }
-    
+
     new_vx[target] = bodies[target].vx + dt * Fx;
     new_vy[target] = bodies[target].vy + dt * Fy;
     new_vz[target] = bodies[target].vz + dt * Fz;
@@ -100,7 +97,8 @@ void allInteractionsDS(Body *bodies, float dt, int nBodies) {
     float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
 
     for (int j = 0; j < nBodies; ++j) {
-      if (i == j) continue;
+      if (i == j)
+        continue;
 
       float dx = bodies[j].x - bodies[i].x;
       float dy = bodies[j].y - bodies[i].y;
@@ -129,7 +127,7 @@ void allInteractionsDS(Body *bodies, float dt, int nBodies) {
 int MACInteractionsDFT(Body *bodies, float dt, int nBodies,
                        std::vector<DFTNode> &dft) {
   int nInteractions = 0;
-  
+
   std::vector<float> new_vx(nBodies), new_vy(nBodies), new_vz(nBodies);
 
 #ifdef ENABLE_CILK
@@ -138,11 +136,12 @@ int MACInteractionsDFT(Body *bodies, float dt, int nBodies,
   for (int target = 0; target < nBodies; target++) {
 #endif
     float Fx = 0.0f, Fy = 0.0f, Fz = 0.0f;
-    
+
     for (size_t j = 0; j < dft.size(); j++) {
       if (dft[j].isLeaf) {
         for (int bIndex : dft[j].bodies) {
-          if (bIndex == target) continue;
+          if (bIndex == target)
+            continue;
 #ifndef ENABLE_CILK
           nInteractions++;
 #endif
@@ -172,7 +171,7 @@ int MACInteractionsDFT(Body *bodies, float dt, int nBodies,
         Fx += dx * dft[j].mass * invDist3;
         Fy += dy * dft[j].mass * invDist3;
         Fz += dz * dft[j].mass * invDist3;
-        
+
         if (dft[j].autorope < dft.size()) {
           j = dft[j].autorope - 1;
         } else {
@@ -195,14 +194,24 @@ int MACInteractionsDFT(Body *bodies, float dt, int nBodies,
   return nInteractions;
 }
 
-void createOctree(std::vector<DFTNode> &dft, Octree *octree, Body *bodies,
-                  int nBodies) {
+void reconstructOctree(Octree *&octree, std::vector<DFTNode> &dft,
+                       Body *particles, int nBodies) {
+
+  // regenerate keys for new positions
+  for (int i = 0; i < nBodies; ++i) {
+    particles[i].key = getKey(particles[i], SHIFT_DIGITS);
+  }
+
+  // free old octree, create new octree (will optimize later)
+  delete octree;
+  octree = new Octree(MAX_KEY_LENGTH);
 
   int nUniqueLeaves = 0;
   for (int i = 0; i < nBodies; i++) {
-    nUniqueLeaves += octree->insert(bodies[i]);
+    nUniqueLeaves += octree->insert(particles[i]);
   }
-  octree->buildDFT(dft, bodies);
+  octree->buildDFT(dft, particles);
+
   // printf("Octree built with %d buckets (leaves with unique key)\n",
   //        nUniqueLeaves);
   // octree->printTree(octree->root, 0);
@@ -211,10 +220,10 @@ void createOctree(std::vector<DFTNode> &dft, Octree *octree, Body *bodies,
 }
 
 // Randomize the positions and velocities in the range [-1, 1],
-// and assign a mass (every 7th float) in the range [0.1, 1.0].
+// and assign a mass (every 7th float) in the range [0.1, 1.1].
 void randomizeBodies(PhiloxEngine &rng, Body *bodies, int n) {
-  std::uniform_real_distribution<float> x_dis(0, 1);
-  std::uniform_real_distribution<float> v_dis(0, 1);
+  std::uniform_real_distribution<double> x_dis(0, 0.99);
+  std::uniform_real_distribution<double> v_dis(0, 1);
 
   for (int i = 0; i < n; i++) {
     Body &body = bodies[i];
@@ -223,13 +232,13 @@ void randomizeBodies(PhiloxEngine &rng, Body *bodies, int n) {
     body.z = x_dis(rng);
 
     body.index = i;
-
+    // set the key for the current body
     body.key = getKey(body, SHIFT_DIGITS);
 
     body.vx = (v_dis(rng)) * 2 - 1;
     body.vy = (v_dis(rng)) * 2 - 1;
     body.vz = (v_dis(rng)) * 2 - 1;
-    body.m = (v_dis(rng)) + 0.1f;
+    body.m = (v_dis(rng)) + 0.1;
   }
 }
 
@@ -240,7 +249,6 @@ float checkAccuracy(Body *p, Body *orig, int nBodies, int nIters) {
   USE_TREE = false;
   USE_BH = false;
   PRINT_TIME = false;
-  CUDA = false;
   nbodyIterate(orig, 0.01f, nBodies, nIters);
   PRINT_TIME = true;
 
@@ -266,43 +274,43 @@ void integratePositions(Body *p, float dt, int start, int end) {
   }
 }
 
-void nbodyIterate(Body *p, float dt, int nBodies, int nIters) {
-  double totalTime = 0.0;
-  ctimer_t timer;
-  std::vector<DFTNode> dft;
-  for (int iter = 1; iter <= nIters; iter++) {
-    ctimer_start(&timer);
+double nbodyIterate(Body *p, float dt, int nBodies, int nIters) {
 
-    if (USE_TREE && iter == 1) {
-      Octree *octree = new Octree(MAX_KEY_LENGTH);
-      createOctree(dft, octree, p, nBodies);
+  // begin benchmark
+  ctimer_t timer;
+  ctimer_start(&timer);
+
+  std::vector<DFTNode> dft;
+  Octree *octree = nullptr;
+
+  if (USE_TREE) {
+    octree = new Octree(MAX_KEY_LENGTH);
+  }
+
+  for (int iter = 1; iter <= nIters; iter++) {
+
+    if (USE_TREE) {
+      reconstructOctree(octree, dft, p, nBodies);
     }
 
     int nInteractions = bodyForce(p, dt, nBodies, dft);
-
-    // Integrate positions
     integratePositions(p, dt, 0, nBodies);
-
-    ctimer_stop(&timer);
-    ctimer_measure(&timer);
-
-    double tElapsed = timespec_sec(timer.elapsed);
-
-    // skip the first iteration as warm-up
-    if (iter > 1)
-      totalTime += tElapsed;
-
-    printf("Iteration %d: time = %.3f seconds\n", iter, tElapsed);
   }
 
-  double avgTime = totalTime / (double)(nIters - 1);
+  if (USE_TREE) {
+    delete octree;
+  }
 
+  ctimer_stop(&timer);
+  ctimer_measure(&timer);
+  double tElapsed = timespec_sec(timer.elapsed);
+
+  // Report time
   if (PRINT_TIME) {
-    printf("Total time = %.3f seconds, Average time = %.3f seconds.\n",
-           totalTime, avgTime);
-    printf("%d Bodies: average %0.3f Billion Interactions / second\n", nBodies,
-           1e-9 * nBodies * nBodies / avgTime);
+    printf("Total time = %.6f seconds\n", tElapsed);
   }
+
+  return tElapsed;
 }
 
 int bodyForce(Body *p, float dt, int n, std::vector<DFTNode> dft) {
@@ -336,7 +344,7 @@ int libMain(const int argc, const char **argv) {
       "q,quiet", "Suppress timing output",
       cxxopts::value<bool>()->default_value("false"))(
       "h,help", "Print usage information")(
-      "w,shiftwidth", "Octree shift width",
+      "w,shiftwidth", "Octree grid resolution (same for x,y,z axis)",
       cxxopts::value<int>()->default_value("16"))("e,error", "Enable flag");
 
   auto result = options.parse(argc, argv);
@@ -416,4 +424,3 @@ int libMain(const int argc, const char **argv) {
   delete[] particles_cp;
   return 0;
 }
-

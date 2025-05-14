@@ -2,15 +2,16 @@ cmake_minimum_required(VERSION 3.18)
 
 
 option(ENABLE_CILK "Enable Cilk based parallelization" ON)
-# Check for OpenCilk (clang with cilk support)
+
 if(ENABLE_CILK)
-    if(DEFINED ENV{CILK_CLANG})
-        set(CILK_COMPILER $ENV{CILK_CLANG})
-        message(STATUS "OpenCilk compiler found: ${CILK_COMPILER}")
-        set(CMAKE_CXX_COMPILER ${CILK_COMPILER})
-    else()
-        message(WARNING "OpenCilk compiler not found, building without Cilk")
-    endif()
+    message(STATUS "Enabling -fopencilk")
+    # if(DEFINED ENV{CILK_CLANG})
+    #     set(CILK_COMPILER $ENV{CILK_CLANG})
+    #     message(STATUS "OpenCilk compiler found: ${CILK_COMPILER}")
+    #     set(CMAKE_CXX_COMPILER ${CILK_COMPILER})
+    # else()
+    #     message(WARNING "OpenCilk compiler not found, building without Cilk")
+    # endif()
 endif()
 
 project(nbody_simulation LANGUAGES CXX C)
@@ -74,7 +75,7 @@ FetchContent_Declare(
 )
 
 # Include directories
-include_directories(${CMAKE_SOURCE_DIR}/common)
+include_directories(BEFORE common)
 
 # Add sources
 add_subdirectory(common)

@@ -187,7 +187,10 @@ Key getKey(Body body, int shift_digits) {
 
   // assert no key overflow
   assert(pos <= (sizeof(Key) * 8 - 1));
-  key += (1LL << (sizeof(Key) * 8 - 1)); // prepend 1
+
+  // prepend a 1 to the key (because this is a leaf)
+  // actual key size = `pos` bits
+  key += (1LL << (sizeof(Key) * 8 - 1)); 
 
   return key;
 }

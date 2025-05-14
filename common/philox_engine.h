@@ -4,7 +4,6 @@
 
 #include "philox_rng.h"
 #include <cstdint>
-#include <limits>
 
 struct PhiloxEngine {
   using result_type = uint32_t;
