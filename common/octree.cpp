@@ -60,15 +60,13 @@ int binaryLength(Key n) {
 
 /* Node functions */
 
-Node::Node(Key key, bool isLeaf) {
+Node::Node(Key key) {
   this->key = key;
-  this->isLeaf = isLeaf;
   this->subTreeSize = 1;
   this->maskChildren = 0;
 
   for (int i = 0; i < 8; ++i)
     this->children[i] = nullptr;
-  this->parent = nullptr;
 }
 
 Node::~Node() {
@@ -113,7 +111,7 @@ void Octree::updateAggregateStats(Node *&node, Body &body) {
 
 int Octree::subdivide(Node *&node, int level) {
   int subidx = this->getOctantIndex(node->key, level + 1);
-  node->children[subidx] = new Node(node->key, true); // push down leaf
+  node->children[subidx] = new Node(node->key); // push down leaf
   node->maskChildren |= (1 << subidx);                // update mask
   node->key -= (1LL << (3 * resolution));             // mark as internal node
   return subidx;
@@ -122,7 +120,7 @@ int Octree::subdivide(Node *&node, int level) {
 int Octree::insert(Body &body) {
 
   if (isEmpty(root)) {
-    root = new Node(body.key, true);
+    root = new Node(body.key);
     return 1;
   }
 
@@ -131,7 +129,7 @@ int Octree::insert(Body &body) {
   for (int level = 0; level < resolution; ++level) {
     if (isEmpty(ptr)) {
       // alloc and mark as leaf
-      ptr = new Node(body.key, true);
+      ptr = new Node(body.key);
       updateAggregateStats(ptr, body);
       addedLeaf = 1;
       break;

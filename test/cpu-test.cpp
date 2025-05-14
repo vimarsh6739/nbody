@@ -73,14 +73,12 @@ TEST(OctreeTest, BinaryString) {
 
 // Test Node constructor
 TEST(OctreeTest, NodeConstructor) {
-  Node node(42, true);
+  Node node(42);
 
   // Check initial values
   ASSERT_EQ(node.key, 42);
-  ASSERT_TRUE(node.isLeaf);
   ASSERT_EQ(node.subTreeSize, 1);
   ASSERT_EQ(node.maskChildren, 0);
-  ASSERT_EQ(node.parent, nullptr);
 
   // Check that all children are nullptr
   for (int i = 0; i < 8; ++i) {

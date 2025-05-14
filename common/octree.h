@@ -38,7 +38,7 @@ public:
   float cx, cy, cz;         // centroid pos
   float tm;                 // total mass
 
-  Node(Key key, bool isLeaf);
+  Node(Key key);
   ~Node();
 };
 
